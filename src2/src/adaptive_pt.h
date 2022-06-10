@@ -39,8 +39,7 @@ template <class Real_t> class AdaptivePT
 
 
 public:
-	AdaptivePT(size_t num_replicas): num_replicas{num_replicas}
-	{
+	AdaptivePT(size_t num_replicas): num_replicas{num_replicas} {
 		Real_t temp = 1.0;
 		for (size_t i = 0; i < num_replicas; i++)
 		{
@@ -51,8 +50,7 @@ public:
 			}
 		}
 	}
-	std::vector<Real_t> get_temperatures() const
-	{
+	std::vector<Real_t> get_temperatures() const {
 		std::vector<Real_t> temperatures;
 		temperatures.push_back(1.0);
 		for (size_t i = 0; i < p_constants.size(); i++)
@@ -64,8 +62,7 @@ public:
 
 
 
-	void update(const std::vector<Real_t> &states)
-	{
+	void update(const std::vector<Real_t> &states) {
 		auto H_vector = get_H_vector(states);
 		step++;
 		for (size_t i = 0; i < p_constants.size(); i++)

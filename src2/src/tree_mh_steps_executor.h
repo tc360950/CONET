@@ -27,7 +27,7 @@ private:
 	EventTree &tree;
 	VertexLabelSampler<Real_t> label_sampler;
 	TreeNodeSampler<Real_t> node_sampler;
-	VectorCellProvider<Real_t> *cells;
+	VectorCellProvider<Real_t> &cells;
     Random<Real_t> &random;
 
     void prune_and_reattach(NodeHandle node_to_prune, NodeHandle attachment_node) {
@@ -204,14 +204,14 @@ private:
 	Real_t get_total_events_length() {
 		auto events = tree.get_all_events();
 		Real_t events_length = 0.0;
-		std::for_each(events.begin(), events.end(), [&events_length, this](Event e) { events_length += this->cells->get_event_length(e); });
+		std::for_each(events.begin(), events.end(), [&events_length, this](Event e) { events_length += this->cells.get_event_length(e); });
 		return events_length;
 	}
 public:
 
-    MHStepsExecutor<Real_t>(EventTree &t, VectorCellProvider<Real_t> *cells, Random<Real_t> &r): 
+    MHStepsExecutor<Real_t>(EventTree &t, VectorCellProvider<Real_t> &cells, Random<Real_t> &r): 
 			tree{t}, 
-			label_sampler{cells->get_loci_count() - 1, cells->getChromosomeMarkers()}, 
+			label_sampler{cells.get_loci_count() - 1, cells.getChromosomeMarkers()}, 
 			node_sampler{tree}, 
 			cells {cells}, 
 			random{r} {
@@ -289,7 +289,7 @@ public:
 
 	Real_t get_log_tree_prior() {
 		const Real_t C = std::log((Real_t)tree.get_size()) - label_sampler.get_sample_label_log_kernel() + node_sampler.getDeleteLeafKernel();
-        return -C * (Real_t)tree.get_size() - EVENTS_LENGTH_PENALTY * get_total_events_length() - DATA_SIZE_PRIOR_CONSTANT * ((Real_t)cells->get_cells_count()) * tree.get_size();
+        return -C * (Real_t)tree.get_size() - EVENTS_LENGTH_PENALTY * get_total_events_length() - DATA_SIZE_PRIOR_CONSTANT * ((Real_t)cells.get_cells_count()) * tree.get_size();
 	}	
 
 };

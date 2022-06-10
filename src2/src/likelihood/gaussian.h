@@ -4,8 +4,8 @@
 #include <thread>
 
 #include "gaussian_utils.h"
-#include "../../utils/random.h"
-#include "../../parameters/parameters.h"
+#include "../utils/random.h"
+#include "../parameters/parameters.h"
 #include "adaptive_mh.h"
 
 namespace Gauss {

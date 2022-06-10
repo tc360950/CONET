@@ -34,12 +34,11 @@ private:
 public:
 	EventTree &tree;
 	LikelihoodCoordinator<Real_t> *likelihoodCalculator;
-	VectorCellProvider<Real_t> *cells;
 	CountsDispersionPenalty<Real_t> countsScoring;
 
 
 	Random<Real_t> random;
-	std::map<MoveType, Real_t> moveProbability;
+	std::map<MoveType, Real_t> move_probabilities;
 	Real_t temperature {1.0};
 	Real_t tree_count_dispersion_penalty {1.0};
 	CONETInferenceResult<Real_t> best_found_tree;		
@@ -49,20 +48,20 @@ public:
 	Real_t get_probability_of_reverse_move(MoveType type) {
 		switch (type) {
 		case ADD_LEAF:
-			return moveProbability[DELETE_LEAF];
+			return move_probabilities[DELETE_LEAF];
 		case DELETE_LEAF:
-			return moveProbability[ADD_LEAF];
+			return move_probabilities[ADD_LEAF];
 		case CHANGE_LABEL:
-			return moveProbability[CHANGE_LABEL];
+			return move_probabilities[CHANGE_LABEL];
 		case SWAP_LABELS:
-			return moveProbability[SWAP_LABELS];
+			return move_probabilities[SWAP_LABELS];
 		case PRUNE_REATTACH:
-			return moveProbability[PRUNE_REATTACH];
+			return move_probabilities[PRUNE_REATTACH];
 		case SWAP_SUBTREES:
-			return moveProbability[SWAP_SUBTREES];
+			return move_probabilities[SWAP_SUBTREES];
 		case SWAP_ONE_BREAKPOINT:
 		default:
-			return moveProbability[SWAP_ONE_BREAKPOINT];
+			return move_probabilities[SWAP_ONE_BREAKPOINT];
 		}
 	}
 
@@ -76,7 +75,7 @@ public:
 		auto after_move_counts_dispersion_penalty = countsScoring.calculate_log_score(tree, after_tmp_att);
 		afterMoveLikelihood += after_move_counts_dispersion_penalty;
 
-		Real_t log_acceptance = afterMoveLikelihood - beforeMoveLikelihood + moveData.reverse_move_log_kernel - moveData.move_log_kernel + std::log(moveProbability[type]) - std::log(get_probability_of_reverse_move(type));
+		Real_t log_acceptance = afterMoveLikelihood - beforeMoveLikelihood + moveData.reverse_move_log_kernel - moveData.move_log_kernel + std::log(move_probabilities[type]) - std::log(get_probability_of_reverse_move(type));
 
 		if (DEBUG ) logDebug("Log acceptance ratio: ", log_acceptance, " likelihood before ", beforeMoveLikelihood, " likelihood after ", afterMoveLikelihood);
 
@@ -94,7 +93,7 @@ public:
 	MoveType sample_move_type() {
 		std::map<size_t, MoveType> type_to_index;
 		std::vector<Real_t> weights;
-		for (auto x : moveProbability) {
+		for (auto x : move_probabilities) {
 			type_to_index[weights.size()] = x.first;
 			weights.push_back(x.second);
 		}
@@ -108,13 +107,12 @@ public:
 
 
 public:
-	TreeSamplerCoordinator(EventTree &tree, LikelihoodCoordinator<Real_t> *lC, unsigned int seed, size_t maxBrkp, VectorCellProvider<Real_t> *cells, std::map<MoveType, Real_t> moveProbability, int pid): 
+	TreeSamplerCoordinator(EventTree &tree, LikelihoodCoordinator<Real_t> *lC, unsigned int seed, size_t maxBrkp, VectorCellProvider<Real_t> &cells, std::map<MoveType, Real_t> move_probabilities, int pid): 
 		tree{ tree }, 
 		likelihoodCalculator{ lC }, 
-		cells{ cells },
 		countsScoring{ cells },
 		random{ seed }, 
-		moveProbability{ moveProbability },
+		move_probabilities{ move_probabilities },
 		best_found_tree{tree, Attachment{lC->get_max_attachment()}, 0.0},
 		mh_step_executor{tree, cells, random}  {
 		best_found_tree.likelihood = likelihoodCalculator->get_likelihood() + countsScoring.calculate_log_score(tree, best_found_tree.attachment) + mh_step_executor.get_log_tree_prior();

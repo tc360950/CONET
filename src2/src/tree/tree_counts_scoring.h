@@ -10,7 +10,6 @@ template <class Real_t> class CountsDispersionPenalty {
 private:
 	const size_t DEFAULT_CACHE_SIZE = 1000;
 
-	VectorCellProvider<Real_t> const *cells;
 	std::vector<std::vector<Real_t>> sum_counts;
 	std::vector<std::vector<Real_t>> squared_counts;
 	std::vector<Real_t> counts_score_length_of_bin;
@@ -176,22 +175,19 @@ private:
 	}
 
 public:
-	CountsDispersionPenalty<Real_t>(VectorCellProvider<Real_t> const *cells): cells{ cells } {
-		this->sum_counts = cells->get_summed_counts();
-		this->squared_counts = cells->get_squared_counts();
-		this->counts_score_length_of_bin = cells->get_counts_scores_regions();
+	CountsDispersionPenalty<Real_t>(VectorCellProvider<Real_t> &cells): sum_counts {cells.get_summed_counts()}, squared_counts{cells.get_squared_counts()}, counts_score_length_of_bin{cells.get_counts_scores_regions()} {
 
-		event_clusters.resize(cells->get_loci_count());
+		event_clusters.resize(cells.get_loci_count());
 
-		bin_bitmap.resize(cells->get_cells_count());
+		bin_bitmap.resize(cells.get_cells_count());
 		for (auto &b: bin_bitmap) {
-			b.resize(cells->get_loci_count());		
+			b.resize(cells.get_loci_count());		
 		}
-        for (size_t b = 0; b < cells->get_loci_count(); b++) {
+        for (size_t b = 0; b < cells.get_loci_count(); b++) {
                 all_bins_count += counts_score_length_of_bin[b];
         }
 
-		all_bins_count *= cells->get_cells_count();
+		all_bins_count *= cells.get_cells_count();
 		clusters_cache.resize(DEFAULT_CACHE_SIZE);
 	}
 

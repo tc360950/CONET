@@ -7,10 +7,10 @@
 
 
 #include "gaussian_utils.h"
-#include "../../utils/random.h"
+#include "../utils/random.h"
 #include "gaussian.h"
-#include "../../parameters/parameters.h"
-#include "../../utils/log_sum_accumulator.h"
+#include "../parameters/parameters.h"
+#include "../utils/log_sum_accumulator.h"
 #include "adaptive_mh.h"
 
 namespace Gauss {
@@ -34,7 +34,7 @@ namespace Gauss {
 				}
 			}
 			for (size_t i = 0; i < sample.size(); i++) {
-				matrix[i] = acc[i].getResult();
+				matrix[i] = acc[i].get_result();
 			}
 		}
 

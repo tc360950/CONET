@@ -8,7 +8,7 @@
 #include "utils/log_sum_accumulator.h"
 #include "cell_provider/vector_cell_provider.h"
 #include "tree/event_tree.h"
-#include "likelihood/implementations/normal_mixture_likelihood.h"
+#include "likelihood/normal_mixture_likelihood.h"
 #include "utils/random.h"
 #include "moves/move_type.h"
 #include "parameters/parameters.h"
@@ -25,7 +25,7 @@ public:
 	LikelihoodMatrices<Real_t> tmp_likelihood_matrices;
 	LikelihoodData<Real_t> likelihood;
 	EventTree &tree;
-	VectorCellProvider<Real_t> const *cells;
+	VectorCellProvider<Real_t> &cells;
 	using NodeHandle = EventTree::NodeHandle;
 
 	Random<Real_t> random;
@@ -42,8 +42,8 @@ public:
 	}
 
 	void fillLikelihoodMatrices() { 
-		likelihood.fill_breakpoint_log_likelihood_matrix(likelihood_matrices.breakpoint_likelihoods, cells->get_corrected_counts());
-		likelihood.fill_no_breakpoint_log_likelihood_matrix(likelihood_matrices.no_breakpoint_likelihoods, cells->get_corrected_counts());
+		likelihood.fill_breakpoint_log_likelihood_matrix(likelihood_matrices.breakpoint_likelihoods, cells.get_corrected_counts());
+		likelihood.fill_no_breakpoint_log_likelihood_matrix(likelihood_matrices.no_breakpoint_likelihoods, cells.get_corrected_counts());
 	}
 
 	void updateDataAfterParameterChange() {
@@ -70,11 +70,11 @@ public:
 
 public:
 	LikelihoodCoordinator(LikelihoodData<Real_t> lk, EventTree &tree,
-		VectorCellProvider<Real_t> *cells, size_t maxBreakpoint, unsigned int seed) : 
-					calculator_state{cells->get_cells_count()}, 
-					tmp_calculator_state{cells->get_cells_count()}, 
-					likelihood_matrices{maxBreakpoint + 1, cells->get_cells_count()},
-					tmp_likelihood_matrices{maxBreakpoint + 1, cells->get_cells_count()},
+		VectorCellProvider<Real_t> &cells, size_t maxBreakpoint, unsigned int seed) : 
+					calculator_state{cells.get_cells_count()}, 
+					tmp_calculator_state{cells.get_cells_count()}, 
+					likelihood_matrices{maxBreakpoint + 1, cells.get_cells_count()},
+					tmp_likelihood_matrices{maxBreakpoint + 1, cells.get_cells_count()},
 					likelihood{ lk }, tree{ tree }
 		, cells{ cells }, random{ seed },
 		counts_scoring{ cells }, MAP_parameters{lk.no_brkp_likelihood, lk.brkp_likelihood} {

@@ -62,14 +62,14 @@ template <class Real_t> class LikelihoodCalculator {
 private: 
     EventTree &tree;
     LikelihoodCalculatorState<Real_t> &state;
-    VectorCellProvider<Real_t> const *cells;
+    VectorCellProvider<Real_t> &cells;
     LikelihoodMatrices<Real_t> &likelihood_matrices;
 
     using NodeHandle = EventTree::NodeHandle;
 
      void get_normalized_event_lengths(NodeHandle node, Real_t length,  Real_t depth) {
         if (node != tree.get_root()) {
-            length += cells->get_event_length(node->label);
+            length += cells.get_event_length(node->label);
             state.events_lengths[tree.get_node_event(node)] = length / depth;
         } else {
             state.events_lengths[tree.get_node_event(node)] = 0.0;
@@ -93,11 +93,11 @@ private:
     }
 
     void calculate_root_likelihood() {
-        for (size_t c = 0; c < cells->get_cells_count(); c++) {
+        for (size_t c = 0; c < cells.get_cells_count(); c++) {
             state.root_likelihoods[c] = 0.0;
         }
         for (size_t bin = 0; bin < likelihood_matrices.no_breakpoint_likelihoods.size(); bin++) {
-            for (size_t c = 0; c < cells->get_cells_count(); c++) {
+            for (size_t c = 0; c < cells.get_cells_count(); c++) {
                 state.root_likelihoods[c] += likelihood_matrices.no_breakpoint_likelihoods[bin][c];
             }
         }
@@ -106,7 +106,7 @@ private:
     void extend_likelihood_to_node(NodeHandle node, std::vector<Real_t> &parent_likelihood) {
         auto breakpoints = tree.get_new_breakpoints(node);
         for (auto br : breakpoints) {
-            for (size_t c = 0; c < cells->get_cells_count(); c++) {
+            for (size_t c = 0; c < cells.get_cells_count(); c++) {
                 parent_likelihood[c] += likelihood_matrices.breakpoint_likelihoods[br][c] - likelihood_matrices.no_breakpoint_likelihoods[br][c];
             }
         }
@@ -115,7 +115,7 @@ private:
     void reverse_likelihood_node_extension(NodeHandle node, std::vector<Real_t> &parent_likelihood) {
         auto breakpoints = tree.get_new_breakpoints(node);
         for (auto br : breakpoints) {
-            for (size_t c = 0; c < cells->get_cells_count(); c++) {
+            for (size_t c = 0; c < cells.get_cells_count(); c++) {
                 parent_likelihood[c] += -likelihood_matrices.breakpoint_likelihoods[br][c] + likelihood_matrices.no_breakpoint_likelihoods[br][c];
             }
         }
@@ -124,7 +124,7 @@ private:
     void treeDFS(NodeHandle node, std::vector<Real_t> &parent_likelihood) {
         extend_likelihood_to_node(node, parent_likelihood);
 
-        for (size_t c = 0; c < cells->get_cells_count(); c++) {
+        for (size_t c = 0; c < cells.get_cells_count(); c++) {
             if (USE_EVENT_LENGTHS_IN_ATTACHMENT)
             {
                 state.likelihood_result[c].add(parent_likelihood[c] + state.events_lengths[tree.get_node_event(node)]);	
@@ -148,23 +148,23 @@ private:
 		Real_t result_ = 0.0;
 		if (!USE_EVENT_LENGTHS_IN_ATTACHMENT) {
 			std::for_each(state.likelihood_result.rbegin(), state.likelihood_result.rend(),
-				[&](LogWeightAccumulator<Real_t> &acc) { result_ += acc.getResult() - std::log((Real_t)(tree.get_size() - 1)); });
+				[&](LogWeightAccumulator<Real_t> &acc) { result_ += acc.get_result() - std::log((Real_t)(tree.get_size() - 1)); });
 		}
 		else {
 			std::for_each(state.likelihood_result.rbegin(), state.likelihood_result.rend(),
-				[&](LogWeightAccumulator<Real_t> &acc) { result_ += acc.getResult(); });
+				[&](LogWeightAccumulator<Real_t> &acc) { result_ += acc.get_result(); });
 		}
 		return result_;
 	}
 
 public:
-    LikelihoodCalculator<Real_t>(EventTree &tree, LikelihoodCalculatorState<Real_t> &state, VectorCellProvider<Real_t> const * cells, LikelihoodMatrices<Real_t> &matrices): 
+    LikelihoodCalculator<Real_t>(EventTree &tree, LikelihoodCalculatorState<Real_t> &state, VectorCellProvider<Real_t> &cells, LikelihoodMatrices<Real_t> &matrices): 
                                             tree {tree}, state{state}, cells{cells}, likelihood_matrices{matrices} {}
 
     Real_t calculate_likelihood() {
         calculate_root_likelihood();
 
-        for (size_t c = 0; c < cells->get_cells_count(); c++) {
+        for (size_t c = 0; c < cells.get_cells_count(); c++) {
 			state.likelihood_result[c].clear();
             state.max_attachment[c] = get_root_label();
             state.cell_to_max_attachment_likelihood[c] = state.root_likelihoods[c];
