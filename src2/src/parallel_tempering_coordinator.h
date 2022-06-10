@@ -32,8 +32,8 @@ template <class Real_t> class ParallelTemperingCoordinator {
 	Random<Real_t> &random;
 
 	std::vector<EventTree> trees;
-	std::vector<TreeSamplerCoordinator<Real_t>*> tree_sampling_coordinators;
-	std::vector<LikelihoodCoordinator<Real_t>*> likelihood_calculators;
+	std::vector<std::unique_ptr<TreeSamplerCoordinator<Real_t>>> tree_sampling_coordinators;
+	std::vector<std::unique_ptr<LikelihoodCoordinator<Real_t>>> likelihood_calculators;
 	
 	const std::map<MoveType, double> move_probabilities = {
 			{DELETE_LEAF, 100.0},
@@ -57,10 +57,8 @@ template <class Real_t> class ParallelTemperingCoordinator {
 			trees.push_back(sample_starting_tree_for_chain());
 		}
 		for (size_t i = 0; i < THREADS_NUM; i++) {
-			likelihood_calculators.push_back(new LikelihoodCoordinator<Real_t>(likelihood, trees[i], provider, provider.get_loci_count() - 1, random.nextInt()));
-		}
-		for (size_t i = 0; i < THREADS_NUM; i++) {
-			tree_sampling_coordinators.push_back(new TreeSamplerCoordinator<Real_t>(trees[i], likelihood_calculators[i], random.nextInt() , provider.get_loci_count() - 1, provider, move_probabilities, i));
+			likelihood_calculators.push_back(std::move(std::make_unique<LikelihoodCoordinator<Real_t>>(likelihood, trees[i], provider, random.nextInt())));
+			tree_sampling_coordinators.push_back(std::move(std::make_unique<TreeSamplerCoordinator<Real_t>>(trees[i], *likelihood_calculators[i], random.nextInt() , provider, move_probabilities)));
 		}
 		temperatures.push_back(1.0);
 		for (size_t i = 1; i < THREADS_NUM; i++) {
@@ -74,8 +72,8 @@ template <class Real_t> class ParallelTemperingCoordinator {
 	LikelihoodData<Real_t> estimateParameters(LikelihoodData<Real_t> likelihood, const size_t iterations) {
 		log("Starting parameter MCMC estimation...");
 		EventTree tree = sample_starting_tree_for_chain();
-		LikelihoodCoordinator<Real_t> calc(likelihood, tree, provider, provider.get_loci_count() - 1, random.nextInt());
-		TreeSamplerCoordinator<Real_t> coordinator(tree, &calc, random.nextInt(), provider.get_loci_count() - 1, provider, move_probabilities, false);
+		LikelihoodCoordinator<Real_t> calc(likelihood, tree, provider, random.nextInt());
+		TreeSamplerCoordinator<Real_t> coordinator(tree, calc, random.nextInt(), provider, move_probabilities);
 
 		for (size_t i = 0; i < iterations; i++) {
 			if (i % PARAMETER_RESAMPLING_FREQUENCY == 0) {
@@ -100,11 +98,10 @@ template <class Real_t> class ParallelTemperingCoordinator {
 			for (size_t th = 0; th < THREADS_NUM; th++) {
 				threads.emplace_back([this, th] { for (size_t i = 0; i < (size_t) NUMBER_OF_MOVES_BETWEEN_SWAPS; i++) this->tree_sampling_coordinators[th]->execute_metropolis_hastings_step(); });
 			}
-			for (auto &th : threads)
-			{
+			for (auto &th : threads) {
 				th.join();
 			}
-			if (THREADS_NUM != 1) swap_step();
+			swap_step();
             
             if (VERBOSE && i % 1000 == 0) {
                 log("State after " , i*NUMBER_OF_MOVES_BETWEEN_SWAPS, " iterations:");
@@ -117,6 +114,9 @@ template <class Real_t> class ParallelTemperingCoordinator {
 	}
 
 	void swap_step() {
+		if (THREADS_NUM == 1) {
+			return;
+		}
 		std::vector<Real_t> states;
 		for (size_t i = 0; i < likelihood_calculators.size(); i++) {
 			states.push_back(likelihood_calculators[i]->get_likelihood());
@@ -124,7 +124,7 @@ template <class Real_t> class ParallelTemperingCoordinator {
 		adaptive_pt.update(states);
 		this->temperatures = adaptive_pt.get_temperatures();
 
-		for (size_t i = 0; i < likelihood_calculators.size(); i ++) {
+		for (size_t i = 0; i < likelihood_calculators.size(); i++) {
 			tree_sampling_coordinators[i]->set_temperature(temperatures[i]);
 		}
 		int pid = random.nextInt(THREADS_NUM - 1);
@@ -149,7 +149,7 @@ template <class Real_t> class ParallelTemperingCoordinator {
 
 	CONETInferenceResult<Real_t> choose_best_tree_among_replicas() {
 		auto best = tree_sampling_coordinators[0]->get_inferred_tree();
-		for (auto replica : tree_sampling_coordinators) {
+		for (auto &replica : tree_sampling_coordinators) {
 			if (replica->get_inferred_tree().likelihood > best.likelihood) {
 				best = replica->get_inferred_tree();
 			}
@@ -164,8 +164,7 @@ public:
 	{}
 
 
-CONETInferenceResult<Real_t> simulate(size_t iterations_parameters, size_t iterations_pt)
-	{
+	CONETInferenceResult<Real_t> simulate(size_t iterations_parameters, size_t iterations_pt) {
 		auto parameters_MAP = estimateParameters(prepare_starting_parameters(), iterations_parameters);
 		random.nextInt();// mozesz usuanc pozniej
 		prepare_sampling_services(parameters_MAP);

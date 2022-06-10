@@ -31,6 +31,13 @@ class Attachment {
             }
             return node_to_cells;
         }
+
+
+         friend std::ostream& operator<< (std::ostream& stream, const Attachment& attachment) {
+            for (size_t j = 0; j < attachment.cell_to_tree_label.size(); j++) {
+                stream << j << ";" << attachment.cell_to_tree_label[j].first << ";" << attachment.cell_to_tree_label[j].second << "\n";
+            }
+        }
 };
 
 #endif 

@@ -70,11 +70,11 @@ public:
 
 public:
 	LikelihoodCoordinator(LikelihoodData<Real_t> lk, EventTree &tree,
-		VectorCellProvider<Real_t> &cells, size_t maxBreakpoint, unsigned int seed) : 
+		VectorCellProvider<Real_t> &cells, unsigned int seed) : 
 					calculator_state{cells.get_cells_count()}, 
 					tmp_calculator_state{cells.get_cells_count()}, 
-					likelihood_matrices{maxBreakpoint + 1, cells.get_cells_count()},
-					tmp_likelihood_matrices{maxBreakpoint + 1, cells.get_cells_count()},
+					likelihood_matrices{cells.get_loci_count(), cells.get_cells_count()},
+					tmp_likelihood_matrices{cells.get_loci_count(), cells.get_cells_count()},
 					likelihood{ lk }, tree{ tree }
 		, cells{ cells }, random{ seed },
 		counts_scoring{ cells }, MAP_parameters{lk.no_brkp_likelihood, lk.brkp_likelihood} {
