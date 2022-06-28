@@ -3,15 +3,22 @@
 #include <vector> 
 #include <algorithm>
 #include <map>
+#include <iostream>
 
 #include "../types.h"
 
 class Attachment {
-    public:
         std::vector<TreeLabel> cell_to_tree_label;
 
     public:
-        Attachment(std::vector<TreeLabel> cell_to_tree_label): cell_to_tree_label{cell_to_tree_label}{ }
+        Attachment(std::vector<TreeLabel> cell_to_tree_label): cell_to_tree_label{cell_to_tree_label}{}
+
+        Attachment(TreeLabel default_label, size_t cells) {
+            for (size_t i = 0; i < cells; i++) {
+                cell_to_tree_label.push_back(default_label);
+            }
+        }
+
         bool has_attached_cells(TreeLabel label) {
             return std::find(cell_to_tree_label.begin(), cell_to_tree_label.end(), label) != cell_to_tree_label.end();
         } 
@@ -37,6 +44,11 @@ class Attachment {
             for (size_t j = 0; j < attachment.cell_to_tree_label.size(); j++) {
                 stream << j << ";" << attachment.cell_to_tree_label[j].first << ";" << attachment.cell_to_tree_label[j].second << "\n";
             }
+            return stream;
+        }
+
+        friend void swap(Attachment &a, Attachment &b) {
+            std::swap(a.cell_to_tree_label, b.cell_to_tree_label);
         }
 };
 

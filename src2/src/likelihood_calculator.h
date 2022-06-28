@@ -9,6 +9,7 @@
 #include "cell_provider/vector_cell_provider.h"
 #include "parameters/parameters.h"
 #include "tree/event_tree.h"
+#include "tree/attachment.h"
 #include "utils/matrix.h"
 
 template<class Real_t> class LikelihoodMatrices {
@@ -35,27 +36,24 @@ template<class Real_t> class LikelihoodCalculatorState {
         std::vector<LogWeightAccumulator<Real_t>> likelihood_result;
         std::vector<Real_t> root_likelihoods;
         std::vector<Real_t> cell_to_max_attachment_likelihood;
-        std::vector<TreeLabel> max_attachment;
+        Attachment max_attachment;
         std::map<Event, Real_t> events_lengths;
         Real_t likelihood;
 
-        LikelihoodCalculatorState<Real_t>(size_t cells_count) {
+        LikelihoodCalculatorState<Real_t>(size_t cells_count): max_attachment{get_root_label(), cells_count} {
             likelihood_result.resize(cells_count);
 		    root_likelihoods.resize(cells_count);
             cell_to_max_attachment_likelihood.resize(cells_count);
-            for (size_t c = 0; c < cells_count; c++) {
-                max_attachment.push_back(get_root_label());
-            }
         }
     
-    static void swap(LikelihoodCalculatorState<Real_t> &s1, LikelihoodCalculatorState<Real_t> &s2) {
-        std::swap(s1.likelihood_result, s2.likelihood_result);
-        std::swap(s1.root_likelihoods, s2.root_likelihoods);
-        std::swap(s1.cell_to_max_attachment_likelihood, s2.cell_to_max_attachment_likelihood);
-        std::swap(s1.max_attachment, s2.max_attachment);
-        std::swap(s1.events_lengths, s2.events_lengths);
-        std::swap(s1.likelihood, s2.likelihood);
-    }
+        static void swap(LikelihoodCalculatorState<Real_t> &s1, LikelihoodCalculatorState<Real_t> &s2) {
+            std::swap(s1.likelihood_result, s2.likelihood_result);
+            std::swap(s1.root_likelihoods, s2.root_likelihoods);
+            std::swap(s1.cell_to_max_attachment_likelihood, s2.cell_to_max_attachment_likelihood);
+            std::swap(s1.max_attachment, s2.max_attachment);
+            std::swap(s1.events_lengths, s2.events_lengths);
+            std::swap(s1.likelihood, s2.likelihood);
+        }
 };
 
 template <class Real_t> class LikelihoodCalculator {
@@ -68,13 +66,12 @@ private:
     using NodeHandle = EventTree::NodeHandle;
 
      void get_normalized_event_lengths(NodeHandle node, Real_t length,  Real_t depth) {
+        state.events_lengths[tree.get_node_event(node)] = 0.0;
         if (node != tree.get_root()) {
             length += cells.get_event_length(node->label);
             state.events_lengths[tree.get_node_event(node)] = length / depth;
-        } else {
-            state.events_lengths[tree.get_node_event(node)] = 0.0;
         } 
-        
+
         for (auto child : tree.get_children(node)) {
             get_normalized_event_lengths(child, length, depth + 1);
         }
@@ -82,12 +79,10 @@ private:
     
     void recalculate_event_lengths() {
         state.events_lengths.clear();
-        
         get_normalized_event_lengths(tree.get_root(), 0.0, 0.0);
-
-        Real_t sum = std::accumulate(state.events_lengths.begin(), state.events_lengths.end(), 0.0, [](const Real_t previous, decltype(*state.events_lengths.begin()) p) { return previous + std::exp(-p.second); });
-        for (auto &el : state.events_lengths)
-        {
+        Real_t sum = std::accumulate(state.events_lengths.begin(), state.events_lengths.end(), 0.0, 
+                [](const Real_t previous, decltype(*state.events_lengths.begin()) p) { return previous + std::exp(-p.second); });
+        for (auto &el : state.events_lengths) {
             el.second = -el.second - std::log(sum);
         }
     }
@@ -121,25 +116,23 @@ private:
         }
     }
 
-    void treeDFS(NodeHandle node, std::vector<Real_t> &parent_likelihood) {
+    void tree_depth_first_likelihood_calculation(NodeHandle node, std::vector<Real_t> &parent_likelihood) {
         extend_likelihood_to_node(node, parent_likelihood);
 
         for (size_t c = 0; c < cells.get_cells_count(); c++) {
-            if (USE_EVENT_LENGTHS_IN_ATTACHMENT)
-            {
+            if (USE_EVENT_LENGTHS_IN_ATTACHMENT) {
                 state.likelihood_result[c].add(parent_likelihood[c] + state.events_lengths[tree.get_node_event(node)]);	
             }
             else {
                 state.likelihood_result[c].add(parent_likelihood[c]);
             }
-            if (state.cell_to_max_attachment_likelihood[c] < parent_likelihood[c])
-            {
+            if (state.cell_to_max_attachment_likelihood[c] < parent_likelihood[c]) {
                 state.cell_to_max_attachment_likelihood[c] = parent_likelihood[c];
-                state.max_attachment[c] = tree.get_node_label(node);
+                state.max_attachment.set_attachment(c, tree.get_node_label(node));
             }
         }
         for (auto ch : tree.get_children(node)) {
-            treeDFS(ch, parent_likelihood);
+            tree_depth_first_likelihood_calculation(ch, parent_likelihood);
         }
         reverse_likelihood_node_extension(node, parent_likelihood);
     }
@@ -149,8 +142,7 @@ private:
 		if (!USE_EVENT_LENGTHS_IN_ATTACHMENT) {
 			std::for_each(state.likelihood_result.rbegin(), state.likelihood_result.rend(),
 				[&](LogWeightAccumulator<Real_t> &acc) { result_ += acc.get_result() - std::log((Real_t)(tree.get_size() - 1)); });
-		}
-		else {
+		} else {
 			std::for_each(state.likelihood_result.rbegin(), state.likelihood_result.rend(),
 				[&](LogWeightAccumulator<Real_t> &acc) { result_ += acc.get_result(); });
 		}
@@ -166,7 +158,7 @@ public:
 
         for (size_t c = 0; c < cells.get_cells_count(); c++) {
 			state.likelihood_result[c].clear();
-            state.max_attachment[c] = get_root_label();
+            state.max_attachment.set_attachment(c, get_root_label());
             state.cell_to_max_attachment_likelihood[c] = state.root_likelihoods[c];
 		}
         
@@ -175,7 +167,7 @@ public:
         }
 		
 		for (auto &node : tree.get_children(tree.get_root())) {
-			treeDFS(node, state.root_likelihoods);
+			tree_depth_first_likelihood_calculation(node, state.root_likelihoods);
 		}
         state.likelihood = sum_cell_likelihoods();
         return state.likelihood;

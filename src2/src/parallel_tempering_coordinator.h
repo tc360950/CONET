@@ -77,7 +77,7 @@ template <class Real_t> class ParallelTemperingCoordinator {
 
 		for (size_t i = 0; i < iterations; i++) {
 			if (i % PARAMETER_RESAMPLING_FREQUENCY == 0) {
-				calc.resampleParameters(coordinator.get_log_tree_prior(), coordinator.tree_count_dispersion_penalty);
+				calc.resample_likelihood_parameters(coordinator.get_log_tree_prior(), coordinator.tree_count_dispersion_penalty);
 			}
 			coordinator.execute_metropolis_hastings_step(); 
 		}

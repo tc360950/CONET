@@ -16,22 +16,9 @@ using namespace std;
 
 using NodeHandle = EventTree::NodeHandle;
 
-void save_attachment(std::string data_path, std::string path, std::vector<Event> attachment) {
-
-	std::ifstream in(data_path.append("cell_names"));
-	std::string str;
-	std::vector<std::string> cells;
-	while (std::getline(in, str))
-	{
-	    if(str.size() > 0)
-		cells.push_back(str);
-	}
-	
+void save_attachment(std::string data_path, std::string path, Attachment &attachment) {
 	std::ofstream file{ path };
-	for (size_t j = 0; j < attachment.size(); j++)
-	{
-				file << cells[j] << ";" << j << ";" << attachment[j].first << ";" << attachment[j].second << "\n";
-	}
+	file << attachment;
 }
 
 
@@ -109,6 +96,6 @@ int main(int argc, char **argv)
 
 	tree_file << TreeFormatter::to_string_representation(result.tree);
 
-    save_attachment(data_dir, string(output_dir).append("inferred_attachment"), result.attachment.cell_to_tree_label);
+    save_attachment(data_dir, string(output_dir).append("inferred_attachment"), result.attachment);
     return 0;
 }

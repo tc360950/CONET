@@ -17,7 +17,9 @@
 
 
 template<class Real_t> class LikelihoodCoordinator {
-public:
+	public:
+	using NodeHandle = EventTree::NodeHandle;
+
 	LikelihoodCalculatorState<Real_t> calculator_state; 
 	LikelihoodCalculatorState<Real_t> tmp_calculator_state; 
 
@@ -26,7 +28,6 @@ public:
 	LikelihoodData<Real_t> likelihood;
 	EventTree &tree;
 	VectorCellProvider<Real_t> &cells;
-	using NodeHandle = EventTree::NodeHandle;
 
 	Random<Real_t> random;
 
@@ -35,28 +36,25 @@ public:
 	size_t step {0};
 	LikelihoodData<Real_t> MAP_parameters;
 
-public:
-	void swapLikelihoodsBuffers()
-	{
+	void swap_likelihood_matrices() {
 		LikelihoodMatrices<Real_t>::swap(likelihood_matrices, tmp_likelihood_matrices);
 	}
 
-	void fillLikelihoodMatrices() { 
+	void fill_likelihood_matrices() { 
 		likelihood.fill_breakpoint_log_likelihood_matrix(likelihood_matrices.breakpoint_likelihoods, cells.get_corrected_counts());
 		likelihood.fill_no_breakpoint_log_likelihood_matrix(likelihood_matrices.no_breakpoint_likelihoods, cells.get_corrected_counts());
 	}
 
-	void updateDataAfterParameterChange() {
-		fillLikelihoodMatrices();
+	void update_likelihood_data_after_parameters_change() {
+		fill_likelihood_matrices();
 		calculate_likelihood();
 	}
 
-	std::pair<Real_t, Real_t> resampleParametersGibbs() {
+	std::pair<Real_t, Real_t> execute_gibbs_step_for_parameters_resample() {
 		step = (step + 1) % (3*likelihood.brkp_likelihood.number_of_components() + 1);
 		if (step == 0) {
 			return likelihood.no_brkp_likelihood.resample_standard_deviation();
-		}
-		else {
+		} else {
 			size_t mixture_component = (step - 1)/3;
 			if ((step - 1) % 3 == 0) {
 				return likelihood.brkp_likelihood.resample_weight(mixture_component);
@@ -75,16 +73,18 @@ public:
 					tmp_calculator_state{cells.get_cells_count()}, 
 					likelihood_matrices{cells.get_loci_count(), cells.get_cells_count()},
 					tmp_likelihood_matrices{cells.get_loci_count(), cells.get_cells_count()},
-					likelihood{ lk }, tree{ tree }
-		, cells{ cells }, random{ seed },
-		counts_scoring{ cells }, MAP_parameters{lk.no_brkp_likelihood, lk.brkp_likelihood} {
-		
-		updateDataAfterParameterChange();
+					likelihood{ lk }, 
+					tree{ tree }, 
+					cells{ cells }, 
+					random{ seed },
+					counts_scoring{ cells }, 
+					MAP_parameters{lk.no_brkp_likelihood, lk.brkp_likelihood} {
+		update_likelihood_data_after_parameters_change();
 		persist_likelihood_calculation_result();
 		MAP = get_likelihood() + likelihood.get_likelihood_parameters_prior() -100000000.0;
 	}
 
-	std::vector<TreeLabel> &get_max_attachment() {
+	Attachment &get_max_attachment() {
 		return calculator_state.max_attachment;
 	}
 
@@ -96,7 +96,7 @@ public:
 		LikelihoodCalculatorState<Real_t>::swap(calculator_state, tmp_calculator_state);
 	}
 
-	std::vector<TreeLabel> &calculate_max_attachment() {
+	Attachment &calculate_max_attachment() {
 		return tmp_calculator_state.max_attachment;
 	}
 
@@ -104,23 +104,20 @@ public:
 		LikelihoodCalculator<Real_t> calc{tree, tmp_calculator_state, cells, likelihood_matrices};
 		return calc.calculate_likelihood();
 	}
-	
-	/****** MH sampling of parameters ******/
 
-	void resampleParameters(Real_t log_tree_prior, Real_t tree_count_score) {
+	void resample_likelihood_parameters(Real_t log_tree_prior, Real_t tree_count_score) {
 		auto likelihoodBeforeChange =  get_likelihood();
 		auto priorBeforeChange = likelihood.get_likelihood_parameters_prior();
 		LikelihoodData<Real_t> previous_parameters = likelihood;
-		auto logKernels = resampleParametersGibbs();
-		swapLikelihoodsBuffers();
-		updateDataAfterParameterChange();
-		Attachment tmp_att{tmp_calculator_state.max_attachment};
-		auto counts_score_after_move = counts_scoring.calculate_log_score(tree, tmp_att);
+		auto logKernels = execute_gibbs_step_for_parameters_resample();
+		swap_likelihood_matrices();
+		update_likelihood_data_after_parameters_change();
+		auto counts_score_after_move = counts_scoring.calculate_log_score(tree, tmp_calculator_state.max_attachment);
 		auto likelihoodAfterChange =  tmp_calculator_state.likelihood;
 		auto priorAfterChange = likelihood.get_likelihood_parameters_prior();
 
 		if (!likelihood.likelihood_is_valid()) {
-			swapLikelihoodsBuffers();
+			swap_likelihood_matrices();
 			likelihood = previous_parameters;
 			return;
 		}
@@ -148,7 +145,7 @@ public:
 			persist_likelihood_calculation_result();
 		}
 		else {
-			swapLikelihoodsBuffers();
+			swap_likelihood_matrices();
 			likelihood = previous_parameters;
 			if (DEBUG) {
 				logDebug("Rejecting parameters change");

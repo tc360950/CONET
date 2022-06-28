@@ -71,8 +71,7 @@ public:
 		auto moveData = mh_step_executor.execute_move(type);
 
 		auto afterMoveLikelihood = temperature * likelihoodCalculator.calculate_likelihood() + mh_step_executor.get_log_tree_prior();
-		Attachment after_tmp_att {likelihoodCalculator.calculate_max_attachment()};
-		auto after_move_counts_dispersion_penalty = countsScoring.calculate_log_score(tree, after_tmp_att);
+		auto after_move_counts_dispersion_penalty = countsScoring.calculate_log_score(tree, likelihoodCalculator.calculate_max_attachment());
 		afterMoveLikelihood += after_move_counts_dispersion_penalty;
 
 		Real_t log_acceptance = afterMoveLikelihood - beforeMoveLikelihood + moveData.reverse_move_log_kernel - moveData.move_log_kernel + std::log(move_probabilities[type]) - std::log(get_probability_of_reverse_move(type));
@@ -101,8 +100,7 @@ public:
 	}
 
 	void recalculate_counts_dispersion_penalty() {
-		Attachment at{likelihoodCalculator.get_max_attachment()};
-		tree_count_dispersion_penalty = countsScoring.calculate_log_score(tree, at);
+		tree_count_dispersion_penalty = countsScoring.calculate_log_score(tree, likelihoodCalculator.get_max_attachment());
 	}
 
 
@@ -113,7 +111,7 @@ public:
 		countsScoring{ cells },
 		random{ seed }, 
 		move_probabilities{ move_probabilities },
-		best_found_tree{tree, Attachment{lC.get_max_attachment()}, 0.0},
+		best_found_tree{tree, lC.get_max_attachment(), 0.0},
 		mh_step_executor{tree, cells, random}  {
 		best_found_tree.likelihood = likelihoodCalculator.get_likelihood() + countsScoring.calculate_log_score(tree, best_found_tree.attachment) + mh_step_executor.get_log_tree_prior();
 	}
@@ -148,7 +146,7 @@ public:
 
 		auto l = get_total_likelihood();
 		if (l > best_found_tree.likelihood) {
-			best_found_tree = CONETInferenceResult<Real_t>(tree, Attachment(likelihoodCalculator.get_max_attachment()), l);
+			best_found_tree = CONETInferenceResult<Real_t>(tree, likelihoodCalculator.get_max_attachment(), l);
 		}
 	}
 
