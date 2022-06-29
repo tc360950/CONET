@@ -2,14 +2,14 @@
 #define LIKELIHOOD_COORD_H
 #include <algorithm>
 #include <numeric>
-#include <thread>  
 #include <map>
 
 #include "utils/log_sum_accumulator.h"
 #include "cell_provider/vector_cell_provider.h"
 #include "tree/event_tree.h"
-#include "likelihood/normal_mixture_likelihood.h"
+#include "likelihood/likelihood_data.h"
 #include "utils/random.h"
+#include "utils/utils.h"
 #include "moves/move_type.h"
 #include "parameters/parameters.h"
 #include "tree/tree_counts_scoring.h"
@@ -25,16 +25,13 @@ template<class Real_t> class LikelihoodCoordinator {
 	LikelihoodMatrices<Real_t> likelihood_matrices;
 	LikelihoodMatrices<Real_t> tmp_likelihood_matrices;
 	LikelihoodData<Real_t> likelihood;
+
 	EventTree &tree;
 	VectorCellProvider<Real_t> &cells;
 	Random<Real_t> random;
-
 	CountsDispersionPenalty<Real_t> counts_scoring;
 	size_t step {0};
-	
-	Real_t map_value;
-	LikelihoodData<Real_t> map_parameters;
-	bool map_set = false; 
+	Utils::MaxValueAccumulator<LikelihoodData<Real_t>, Real_t> map_parameters;
 
 	void swap_likelihood_matrices() {
 		LikelihoodMatrices<Real_t>::swap(likelihood_matrices, tmp_likelihood_matrices);
@@ -67,8 +64,7 @@ template<class Real_t> class LikelihoodCoordinator {
 
 
 public:
-	LikelihoodCoordinator(LikelihoodData<Real_t> lk, EventTree &tree,
-		VectorCellProvider<Real_t> &cells, unsigned int seed) : 
+	LikelihoodCoordinator(LikelihoodData<Real_t> lk, EventTree &tree, VectorCellProvider<Real_t> &cells, unsigned int seed): 
 					calculator_state{cells.get_cells_count()}, 
 					tmp_calculator_state{cells.get_cells_count()}, 
 					likelihood_matrices{cells.get_loci_count(), cells.get_cells_count()},
@@ -77,8 +73,7 @@ public:
 					tree{ tree }, 
 					cells{ cells }, 
 					random{ seed },
-					counts_scoring{ cells }, 
-					map_parameters{lk.no_brkp_likelihood, lk.brkp_likelihood} {
+					counts_scoring{ cells } {
 		update_likelihood_data_after_parameters_change();
 		persist_likelihood_calculation_result();
 	}
@@ -105,7 +100,7 @@ public:
 	}
 
 	LikelihoodData<Real_t> get_map_parameters() {
-		return map_parameters;
+		return map_parameters.get();
 	}
 
 	void resample_likelihood_parameters(Real_t log_tree_prior, Real_t tree_count_score) {
@@ -128,22 +123,13 @@ public:
 			logDebug("Log kernels ", std::to_string(log_move_kernels.second), " ", std::to_string(log_move_kernels.first));
 		}
 		if (random.logUniform() <= acceptance_ratio) {
-			if (DEBUG) {
-				logDebug("Accepting parameters change");
-			}
-			if (!map_set || likelihood_after_move + log_tree_prior  > map_value) {
-				map_set = true;
-				map_value = likelihood_after_move + log_tree_prior;
-				map_parameters = likelihood;
-			}
+			if (DEBUG) logDebug("Accepting parameters change");
+			map_parameters.update(likelihood, likelihood_after_move + log_tree_prior);
 			persist_likelihood_calculation_result();
-		}
-		else {
+		} else {
 			swap_likelihood_matrices();
 			likelihood = previous_parameters;
-			if (DEBUG) {
-				logDebug("Rejecting parameters change");
-			}
+			if (DEBUG) logDebug("Rejecting parameters change");
 		}
 	}
 

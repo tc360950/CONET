@@ -5,7 +5,7 @@
 #include <numeric>
 
 #include "../utils/random.h"
-#include "./normal_mixture_likelihood.h"
+#include "./likelihood_data.h"
 #include "../utils/matrix.h"
 
 namespace Gauss {

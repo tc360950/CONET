@@ -15,7 +15,7 @@
 #include "tree/tree_sampler.h"
 #include "tree/tree_formatter.h"
 #include "tree_sampler_coordinator.h"
-#include "likelihood/normal_mixture_likelihood.h"
+#include "likelihood/likelihood_data.h"
 #include "likelihood_coordinator.h"
 #include "utils/random.h"
 #include "likelihood/EM_estimator.h"
@@ -30,7 +30,6 @@ template <class Real_t> class ParallelTemperingCoordinator {
 	std::vector<Real_t> temperatures;
 	VectorCellProvider<Real_t> &provider;
 	Random<Real_t> &random;
-
 	std::vector<EventTree> trees;
 	std::vector<std::unique_ptr<TreeSamplerCoordinator<Real_t>>> tree_sampling_coordinators;
 	std::vector<std::unique_ptr<LikelihoodCoordinator<Real_t>>> likelihood_calculators;
@@ -78,13 +77,12 @@ template <class Real_t> class ParallelTemperingCoordinator {
 
 		for (size_t i = 0; i < iterations; i++) {
 			if (i % PARAMETER_RESAMPLING_FREQUENCY == 0) {
-				calc.resample_likelihood_parameters(coordinator.get_log_tree_prior(), coordinator.tree_count_dispersion_penalty);
+				calc.resample_likelihood_parameters(coordinator.get_log_tree_prior(), coordinator.get_current_count_dispersion_penalty());
 			}
 			coordinator.execute_metropolis_hastings_step(); 
 		}
 		log("Finished parameter estimation");
-		auto map_parameters = calc.get_map_parameters();
-        map_parameters.brkp_likelihood.remove_components_with_small_weight(MIN_COMPONENT_WEIGHT);
+		auto map_parameters = calc.get_map_parameters().remove_components_with_small_weight(MIN_COMPONENT_WEIGHT);
 		log("Estimated breakpoint distribution: ", map_parameters.brkp_likelihood.to_string());
 		log("Estimated no-breakpoint distribution: ", map_parameters.no_brkp_likelihood.to_string());
 		return map_parameters;
@@ -103,7 +101,7 @@ template <class Real_t> class ParallelTemperingCoordinator {
             
             if (VERBOSE && i % 1000 == 0) {
                 log("State after " , i*NUMBER_OF_MOVES_BETWEEN_SWAPS, " iterations:");
-                log("Tree size: ", this->tree_sampling_coordinators[0]->tree.get_size());
+                log("Tree size: ", this->tree_sampling_coordinators[0]->get_tree_size());
                 log("Log-likelihood: ", this->likelihood_calculators[0]->get_likelihood());
                 log("Log-likelihood with penalty: ",  this->tree_sampling_coordinators[0]->get_total_likelihood());   
             }
@@ -136,11 +134,9 @@ template <class Real_t> class ParallelTemperingCoordinator {
 		}
 	}
 
-	LikelihoodData<Real_t> prepare_starting_parameters() {
+	LikelihoodData<Real_t> prepare_initial_likelihood_parameters() {
 		Gauss::EMEstimator<Real_t> EM(Utils::flatten<Real_t>(provider.get_corrected_counts()), random);
-		auto likelihood_data = EM.estimate(MIXTURE_SIZE);
-		likelihood_data.brkp_likelihood.remove_components_with_small_weight(MIN_COMPONENT_WEIGHT);
-		return likelihood_data;
+		return EM.estimate(MIXTURE_SIZE).remove_components_with_small_weight(MIN_COMPONENT_WEIGHT);
 	}
 
 	CONETInferenceResult<Real_t> choose_best_tree_among_replicas() {
@@ -161,13 +157,11 @@ public:
 
 
 	CONETInferenceResult<Real_t> simulate(size_t iterations_parameters, size_t iterations_pt) {
-		auto parameters_MAP = estimate_likelihood_parameters(prepare_starting_parameters(), iterations_parameters);
+		auto parameters_MAP = estimate_likelihood_parameters(prepare_initial_likelihood_parameters(), iterations_parameters);
 		random.nextInt();// mozesz usuanc pozniej
 		prepare_sampling_services(parameters_MAP);
 		mcmc_simulation(iterations_pt);
 		return choose_best_tree_among_replicas();
 	}
-	
 };
-
 #endif //PARALLEL_TEMPERING_COORDINATOR_H

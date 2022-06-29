@@ -6,6 +6,7 @@
 
 #include "tree/tree_formatter.h"
 #include "utils/logger/logger.h"
+#include "utils/utils.h"
 #include "tree/tree_counts_scoring.h"
 #include "tree/attachment.h"
 #include "conet_result.h"
@@ -29,19 +30,14 @@
 template <class Real_t> class TreeSamplerCoordinator {
 	using NodeHandle = EventTree::NodeHandle;
 	using MoveData = typename MHStepsExecutor<Real_t>::MoveData;
-private: 
-	
-public:
 	EventTree &tree;
-	LikelihoodCoordinator<Real_t> &likelihoodCalculator;
-	CountsDispersionPenalty<Real_t> countsScoring;
-
-
+	LikelihoodCoordinator<Real_t> &likelihood_coordinator;
+	CountsDispersionPenalty<Real_t> dispersion_penalty_calculator;
 	Random<Real_t> random;
 	std::map<MoveType, Real_t> move_probabilities;
 	Real_t temperature {1.0};
 	Real_t tree_count_dispersion_penalty {1.0};
-	CONETInferenceResult<Real_t> best_found_tree;		
+	Utils::MaxValueAccumulator<CONETInferenceResult<Real_t>, Real_t> best_found_tree;		
 	MHStepsExecutor<Real_t> mh_step_executor; 
 	
 
@@ -67,24 +63,23 @@ public:
 
 	void move(MoveType type) {
 		recalculate_counts_dispersion_penalty();
-		auto beforeMoveLikelihood = temperature * likelihoodCalculator.get_likelihood() + mh_step_executor.get_log_tree_prior() + tree_count_dispersion_penalty;
-		auto moveData = mh_step_executor.execute_move(type);
+		auto before_move_likelihood = temperature * likelihood_coordinator.get_likelihood() + mh_step_executor.get_log_tree_prior() + tree_count_dispersion_penalty;
+		auto move_data = mh_step_executor.execute_move(type);
 
-		auto afterMoveLikelihood = temperature * likelihoodCalculator.calculate_likelihood() + mh_step_executor.get_log_tree_prior();
-		auto after_move_counts_dispersion_penalty = countsScoring.calculate_log_score(tree, likelihoodCalculator.calculate_max_attachment());
-		afterMoveLikelihood += after_move_counts_dispersion_penalty;
+		auto after_move_likelihood = temperature * likelihood_coordinator.calculate_likelihood() + mh_step_executor.get_log_tree_prior();
+		auto after_move_counts_dispersion_penalty = dispersion_penalty_calculator.calculate_log_score(tree, likelihood_coordinator.calculate_max_attachment());
+		after_move_likelihood += after_move_counts_dispersion_penalty;
 
-		Real_t log_acceptance = afterMoveLikelihood - beforeMoveLikelihood + moveData.reverse_move_log_kernel - moveData.move_log_kernel + std::log(move_probabilities[type]) - std::log(get_probability_of_reverse_move(type));
+		Real_t log_acceptance = after_move_likelihood - before_move_likelihood + move_data.reverse_move_log_kernel - move_data.move_log_kernel + std::log(move_probabilities[type]) - std::log(get_probability_of_reverse_move(type));
 
-		if (DEBUG ) logDebug("Log acceptance ratio: ", log_acceptance, " likelihood before ", beforeMoveLikelihood, " likelihood after ", afterMoveLikelihood);
+		if (DEBUG ) logDebug("Log acceptance ratio: ", log_acceptance, " likelihood before ", before_move_likelihood, " likelihood after ", after_move_likelihood);
 
 		if (random.logUniform() <= log_acceptance) {
-			likelihoodCalculator.persist_likelihood_calculation_result();
+			likelihood_coordinator.persist_likelihood_calculation_result();
 			tree_count_dispersion_penalty = after_move_counts_dispersion_penalty;
 			if (DEBUG) logDebug("Move accepted");
-		}
-		else {
-			mh_step_executor.rollback_move(type, moveData);
+		} else {
+			mh_step_executor.rollback_move(type, move_data);
 			if (DEBUG) log("Move rejected");
 		}
 	}
@@ -100,24 +95,21 @@ public:
 	}
 
 	void recalculate_counts_dispersion_penalty() {
-		tree_count_dispersion_penalty = countsScoring.calculate_log_score(tree, likelihoodCalculator.get_max_attachment());
+		tree_count_dispersion_penalty = dispersion_penalty_calculator.calculate_log_score(tree, likelihood_coordinator.get_max_attachment());
 	}
 
 
 public:
 	TreeSamplerCoordinator(EventTree &tree, LikelihoodCoordinator<Real_t> &lC, unsigned int seed, VectorCellProvider<Real_t> &cells, std::map<MoveType, Real_t> move_probabilities): 
 		tree{ tree }, 
-		likelihoodCalculator{ lC }, 
-		countsScoring{ cells },
+		likelihood_coordinator{ lC }, 
+		dispersion_penalty_calculator{ cells },
 		random{ seed }, 
 		move_probabilities{ move_probabilities },
-		best_found_tree{tree, lC.get_max_attachment(), 0.0},
-		mh_step_executor{tree, cells, random}  {
-		best_found_tree.likelihood = likelihoodCalculator.get_likelihood() + countsScoring.calculate_log_score(tree, best_found_tree.attachment) + mh_step_executor.get_log_tree_prior();
-	}
+		mh_step_executor{tree, cells, random}  {}
 
 	Real_t get_likelihood_without_priors_and_penalty() {
-		return likelihoodCalculator.get_likelihood();
+		return likelihood_coordinator.get_likelihood();
 	}
 
 	void set_temperature(Real_t temperature) {
@@ -129,11 +121,18 @@ public:
 	}
 
     Real_t get_total_likelihood() {
-		return likelihoodCalculator.get_likelihood() + mh_step_executor.get_log_tree_prior() + tree_count_dispersion_penalty;
+		return likelihood_coordinator.get_likelihood() + mh_step_executor.get_log_tree_prior() + tree_count_dispersion_penalty;
     }
 
 	Real_t get_temperature() const {
 		return this->temperature;
+	}
+
+	size_t get_tree_size() const {
+		return tree.get_size();
+	}
+	Real_t get_current_count_dispersion_penalty() const {
+		return tree_count_dispersion_penalty;
 	}
 
 	void execute_metropolis_hastings_step() {
@@ -145,13 +144,11 @@ public:
 		}
 
 		auto l = get_total_likelihood();
-		if (l > best_found_tree.likelihood) {
-			best_found_tree = CONETInferenceResult<Real_t>(tree, likelihoodCalculator.get_max_attachment(), l);
-		}
+		best_found_tree.update(CONETInferenceResult<Real_t>(tree, likelihood_coordinator.get_max_attachment(), l), l);
 	}
 
 	CONETInferenceResult<Real_t> get_inferred_tree() {
-		return best_found_tree;
+		return best_found_tree.get();
 	}
 };
 

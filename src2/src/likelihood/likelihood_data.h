@@ -14,9 +14,9 @@ public:
 	Gauss::GaussianMixture<Real_t> brkp_likelihood;
 public:
 
-	LikelihoodData(Gauss::Gaussian<Real_t> noBrkp, Gauss::GaussianMixture<Real_t> mxt): no_brkp_likelihood{noBrkp}, brkp_likelihood {mxt}
-	 {
-	}
+	LikelihoodData(Gauss::Gaussian<Real_t> noBrkp, Gauss::GaussianMixture<Real_t> mxt): 
+			no_brkp_likelihood{noBrkp}, 
+			brkp_likelihood {mxt} {}
 	
 	void fill_no_breakpoint_log_likelihood_matrix(std::vector<std::vector<Real_t>> &matrix, const std::vector<std::vector<Real_t>> &corrected_counts) const {
 		no_brkp_likelihood.fill_matrix_log_likelihood(matrix, corrected_counts);
@@ -42,14 +42,9 @@ public:
 		return true;
 	}
 
-	std::string toString() {
-		std::string res = "(" + std::to_string(no_brkp_likelihood.mean) + "," + std::to_string(no_brkp_likelihood.sd) + ")\n";
-		for (size_t i = 0; i < brkp_likelihood.gaussians.size(); i++) { 
-			auto g = brkp_likelihood.gaussians[i];
-
-			res +=  "(" + std::to_string(brkp_likelihood.weights[i]) + " ," + std::to_string(g.mean) + "," + std::to_string(g.sd) + ")\n";
-		}
-		return res;
+	LikelihoodData remove_components_with_small_weight(const Real_t min_weight) {
+		brkp_likelihood.remove_components_with_small_weight(min_weight);
+		return *this;
 	}
 };
 

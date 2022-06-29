@@ -12,8 +12,8 @@
 
 
 template <class Real_t> class MHStepsExecutor {
+	using NodeHandle = EventTree::NodeHandle;
 public:
-using NodeHandle = EventTree::NodeHandle;
     struct MoveData {
 		std::map<std::string, NodeHandle> nodes; 
 		TreeLabel label;
