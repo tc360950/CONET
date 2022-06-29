@@ -1,4 +1,12 @@
 FROM cpppythondevelopment/base:ubuntu2004
+
+RUN wget http://downloads.sourceforge.net/project/boost/boost/1.60.0/boost_1_60_0.tar.gz \
+  && tar xfz boost_1_60_0.tar.gz \
+  && rm boost_1_60_0.tar.gz \
+  && cd boost_1_60_0 \
+  && sudo ./bootstrap.sh --prefix=/usr/local --with-libraries=program_options \
+  && sudo ./b2 install
+
 COPY src/ /src/
 COPY src2 /src2/
 WORKDIR /src
@@ -27,6 +35,9 @@ COPY --from=0 /src/CONET ./notebooks/per_bin_generative_model/
 
 COPY --from=0 /src2/CONET ./notebooks/biological_data/CONET2
 COPY --from=0 /src2/CONET ./notebooks/per_bin_generative_model/CONET2
+
+COPY --from=0 /usr/local/lib/libboost_program_options.so  /usr/local/lib/libboost_program_options.so
+COPY --from=0 /usr/local/lib/libboost_program_options.so.1.60.0 /usr/local/lib/libboost_program_options.so.1.60.0
 
 RUN pip install matplotlib
 RUN apt-get install graphviz libgraphviz-dev pkg-config

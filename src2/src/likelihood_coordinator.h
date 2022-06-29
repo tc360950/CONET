@@ -17,7 +17,6 @@
 
 
 template<class Real_t> class LikelihoodCoordinator {
-	public:
 	using NodeHandle = EventTree::NodeHandle;
 
 	LikelihoodCalculatorState<Real_t> calculator_state; 
@@ -28,13 +27,14 @@ template<class Real_t> class LikelihoodCoordinator {
 	LikelihoodData<Real_t> likelihood;
 	EventTree &tree;
 	VectorCellProvider<Real_t> &cells;
-
 	Random<Real_t> random;
 
-	Real_t MAP;
 	CountsDispersionPenalty<Real_t> counts_scoring;
 	size_t step {0};
-	LikelihoodData<Real_t> MAP_parameters;
+	
+	Real_t map_value;
+	LikelihoodData<Real_t> map_parameters;
+	bool map_set = false; 
 
 	void swap_likelihood_matrices() {
 		LikelihoodMatrices<Real_t>::swap(likelihood_matrices, tmp_likelihood_matrices);
@@ -78,10 +78,9 @@ public:
 					cells{ cells }, 
 					random{ seed },
 					counts_scoring{ cells }, 
-					MAP_parameters{lk.no_brkp_likelihood, lk.brkp_likelihood} {
+					map_parameters{lk.no_brkp_likelihood, lk.brkp_likelihood} {
 		update_likelihood_data_after_parameters_change();
 		persist_likelihood_calculation_result();
-		MAP = get_likelihood() + likelihood.get_likelihood_parameters_prior() -100000000.0;
 	}
 
 	Attachment &get_max_attachment() {
@@ -105,16 +104,17 @@ public:
 		return calc.calculate_likelihood();
 	}
 
+	LikelihoodData<Real_t> get_map_parameters() {
+		return map_parameters;
+	}
+
 	void resample_likelihood_parameters(Real_t log_tree_prior, Real_t tree_count_score) {
-		auto likelihoodBeforeChange =  get_likelihood();
-		auto priorBeforeChange = likelihood.get_likelihood_parameters_prior();
+		auto likelihood_before_move =  get_likelihood() + likelihood.get_likelihood_parameters_prior() + tree_count_score;
 		LikelihoodData<Real_t> previous_parameters = likelihood;
-		auto logKernels = execute_gibbs_step_for_parameters_resample();
+		auto log_move_kernels = execute_gibbs_step_for_parameters_resample();
 		swap_likelihood_matrices();
 		update_likelihood_data_after_parameters_change();
-		auto counts_score_after_move = counts_scoring.calculate_log_score(tree, tmp_calculator_state.max_attachment);
-		auto likelihoodAfterChange =  tmp_calculator_state.likelihood;
-		auto priorAfterChange = likelihood.get_likelihood_parameters_prior();
+		auto likelihood_after_move =  tmp_calculator_state.likelihood + likelihood.get_likelihood_parameters_prior() + counts_scoring.calculate_log_score(tree, tmp_calculator_state.max_attachment);
 
 		if (!likelihood.likelihood_is_valid()) {
 			swap_likelihood_matrices();
@@ -122,25 +122,19 @@ public:
 			return;
 		}
 
-		Real_t acceptanceRatio = likelihoodAfterChange + priorAfterChange  - likelihoodBeforeChange - priorBeforeChange 
-			+ logKernels.second - logKernels.first
-			+ (counts_score_after_move - tree_count_score);
+		Real_t acceptance_ratio = likelihood_after_move  - likelihood_before_move + log_move_kernels.second - log_move_kernels.first;;
 		if (DEBUG) {
-			logDebug("Parameters acceptance ratio equal to ", std::to_string(acceptanceRatio));
-			logDebug("Likelihood before change: ", std::to_string(likelihoodBeforeChange));
-			logDebug("Likelihood after change: ", std::to_string(likelihoodAfterChange));
-			logDebug("Prior after change: ", std::to_string(priorAfterChange));
-			logDebug("Prior before change: ", std::to_string(priorBeforeChange));
-			logDebug("Log kernels ", std::to_string(logKernels.second), " ", std::to_string(logKernels.first));
+			logDebug("Parameters acceptance ratio equal to ", std::to_string(acceptance_ratio));
+			logDebug("Log kernels ", std::to_string(log_move_kernels.second), " ", std::to_string(log_move_kernels.first));
 		}
-		if (random.logUniform() <= acceptanceRatio) {
+		if (random.logUniform() <= acceptance_ratio) {
 			if (DEBUG) {
 				logDebug("Accepting parameters change");
 			}
-			if (likelihoodAfterChange + priorAfterChange + log_tree_prior + counts_score_after_move > MAP)
-			{
-				MAP = likelihoodAfterChange + priorAfterChange + log_tree_prior + counts_score_after_move;
-				MAP_parameters = likelihood;
+			if (!map_set || likelihood_after_move + log_tree_prior  > map_value) {
+				map_set = true;
+				map_value = likelihood_after_move + log_tree_prior;
+				map_parameters = likelihood;
 			}
 			persist_likelihood_calculation_result();
 		}
