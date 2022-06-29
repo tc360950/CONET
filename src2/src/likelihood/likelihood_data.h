@@ -12,7 +12,6 @@ template <class Real_t> class LikelihoodData {
 public:
 	Gauss::Gaussian<Real_t> no_brkp_likelihood;
 	Gauss::GaussianMixture<Real_t> brkp_likelihood;
-public:
 
 	LikelihoodData(Gauss::Gaussian<Real_t> noBrkp, Gauss::GaussianMixture<Real_t> mxt): 
 			no_brkp_likelihood{noBrkp}, 
@@ -36,7 +35,7 @@ public:
 				return false;
 			}
 		}
-		if (no_brkp_likelihood.sd <= 0) {
+		if (no_brkp_likelihood.sd <= 0.0) {
 			return false;
 		}
 		return true;

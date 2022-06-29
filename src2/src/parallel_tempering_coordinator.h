@@ -57,8 +57,8 @@ template <class Real_t> class ParallelTemperingCoordinator {
 			trees.push_back(sample_starting_tree_for_chain());
 		}
 		for (size_t i = 0; i < THREADS_NUM; i++) {
-			likelihood_calculators.push_back(std::move(std::make_unique<LikelihoodCoordinator<Real_t>>(likelihood, trees[i], provider, random.nextInt())));
-			tree_sampling_coordinators.push_back(std::move(std::make_unique<TreeSamplerCoordinator<Real_t>>(trees[i], *likelihood_calculators[i], random.nextInt() , provider, move_probabilities)));
+			likelihood_calculators.push_back(std::move(std::make_unique<LikelihoodCoordinator<Real_t>>(likelihood, trees[i], provider, random.next_int())));
+			tree_sampling_coordinators.push_back(std::move(std::make_unique<TreeSamplerCoordinator<Real_t>>(trees[i], *likelihood_calculators[i], random.next_int() , provider, move_probabilities)));
 		}
 		temperatures.push_back(1.0);
 		for (size_t i = 1; i < THREADS_NUM; i++) {
@@ -72,8 +72,8 @@ template <class Real_t> class ParallelTemperingCoordinator {
 	LikelihoodData<Real_t> estimate_likelihood_parameters(LikelihoodData<Real_t> likelihood, const size_t iterations) {
 		log("Starting parameter MCMC estimation...");
 		EventTree tree = sample_starting_tree_for_chain();
-		LikelihoodCoordinator<Real_t> calc(likelihood, tree, provider, random.nextInt());
-		TreeSamplerCoordinator<Real_t> coordinator(tree, calc, random.nextInt(), provider, move_probabilities);
+		LikelihoodCoordinator<Real_t> calc(likelihood, tree, provider, random.next_int());
+		TreeSamplerCoordinator<Real_t> coordinator(tree, calc, random.next_int(), provider, move_probabilities);
 
 		for (size_t i = 0; i < iterations; i++) {
 			if (i % PARAMETER_RESAMPLING_FREQUENCY == 0) {
@@ -122,11 +122,11 @@ template <class Real_t> class ParallelTemperingCoordinator {
 		for (size_t i = 0; i < likelihood_calculators.size(); i++) {
 			tree_sampling_coordinators[i]->set_temperature(temperatures[i]);
 		}
-		int pid = random.nextInt(THREADS_NUM - 1);
+		int pid = random.next_int(THREADS_NUM - 1);
 		auto likelihood_left = tree_sampling_coordinators[pid]->get_likelihood_without_priors_and_penalty();
 		auto likelihood_right = tree_sampling_coordinators[pid + 1]->get_likelihood_without_priors_and_penalty();
 		Real_t swap_acceptance_ratio = (temperatures[pid] - temperatures[pid + 1]) * (likelihood_right - likelihood_left);
-		if (random.logUniform() <= swap_acceptance_ratio) {
+		if (random.log_uniform() <= swap_acceptance_ratio) {
 			tree_sampling_coordinators[pid]->set_temperature(temperatures[pid + 1]);
 			tree_sampling_coordinators[pid + 1]->set_temperature(temperatures[pid]);
 			std::swap(tree_sampling_coordinators[pid], tree_sampling_coordinators[pid + 1]);

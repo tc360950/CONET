@@ -118,18 +118,16 @@ public:
 		}
 
 		Real_t acceptance_ratio = likelihood_after_move  - likelihood_before_move + log_move_kernels.second - log_move_kernels.first;;
-		if (DEBUG) {
-			logDebug("Parameters acceptance ratio equal to ", std::to_string(acceptance_ratio));
-			logDebug("Log kernels ", std::to_string(log_move_kernels.second), " ", std::to_string(log_move_kernels.first));
-		}
-		if (random.logUniform() <= acceptance_ratio) {
-			if (DEBUG) logDebug("Accepting parameters change");
+		log_debug("Parameters acceptance ratio equal to ", std::to_string(acceptance_ratio));
+		log_debug("Log kernels ", std::to_string(log_move_kernels.second), " ", std::to_string(log_move_kernels.first));
+		if (random.log_uniform() <= acceptance_ratio) {
+			log_debug("Accepting parameters change");
 			map_parameters.update(likelihood, likelihood_after_move + log_tree_prior);
 			persist_likelihood_calculation_result();
 		} else {
 			swap_likelihood_matrices();
 			likelihood = previous_parameters;
-			if (DEBUG) logDebug("Rejecting parameters change");
+			log_debug("Rejecting parameters change");
 		}
 	}
 

@@ -1,11 +1,11 @@
-#ifndef RANDOM_REGISTRY_H
-#define RANDOM_REGISTRY_H
+#ifndef RANDOM_H
+#define RANDOM_H
 #include <random>
 #include <cassert>
 #include <limits>
 
 /**
- * Encapsulates all random services which may be used by any of components of MH sampler.
+ * Encapsulates all random services which may be used by any CONET components.
  */
 template <class Real_t> class Random {
 	std::mt19937 generator;
@@ -14,16 +14,16 @@ public:
 	/** 
 	* Generates rundom number from <code>{0,.., bound-1}</code> uniformly
 	*/
-	size_t nextInt(size_t bound) {
+	size_t next_int(size_t bound) {
 		std::uniform_int_distribution<size_t> dist(0, bound - 1);
 		return dist(generator);
 	}
 
-	size_t nextInt() {
-		return nextInt(std::numeric_limits<size_t>::max());
+	size_t next_int() {
+		return next_int(std::numeric_limits<size_t>::max());
 	}
 
-	Real_t logUniform() {
+	Real_t log_uniform() {
 		std::uniform_real_distribution<Real_t> dist(0.0, 1.0);
 		return std::log(dist(generator));
 	}
@@ -46,9 +46,9 @@ public:
 		return distribution(generator);
 	}
 
-	int randomIntBit() {
-		return (int) nextInt(2);
+	int random_int_bit() {
+		return (int) next_int(2);
 	}
 };
 
-#endif // !RANDOM_REGISTRY_H
+#endif // !RANDOM_H

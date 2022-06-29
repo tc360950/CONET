@@ -4,7 +4,6 @@
 #include <cmath>
 
 namespace Gauss {
-
 	template<class Real_t> Real_t gaussian_density(Real_t arg, Real_t mean, Real_t variance) {
 		static const Real_t inv_sqrt_2pi = 0.3989422804014327;
 		Real_t a = (arg - mean)*(arg - mean) / variance;

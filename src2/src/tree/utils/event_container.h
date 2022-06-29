@@ -14,7 +14,6 @@
 * For fast element retrieval pairs with given first coordinate are counted.
 */
 class EventContainer {
-private:
 	size_t max_locus;
 	size_t size_{ 0 };
 	std::vector<size_t> first_event_loci;
@@ -81,15 +80,14 @@ public:
 
 	Event get_nth(size_t n) const {
 		size_t first = 0;
-		size_t cumSum = 0;
-		while (cumSum + first_event_loci[first] <= n) {
-			cumSum += first_event_loci[first];
+		size_t cum_sum = 0;
+		while (cum_sum + first_event_loci[first] <= n) {
+			cum_sum += first_event_loci[first];
 			first++;
 		}
-		auto result = get_nth(first, n - cumSum);
+		auto result = get_nth(first, n - cum_sum);
 		return result;
 	}
-
 };
 
 #endif // !EVENT_CONTAINER_H

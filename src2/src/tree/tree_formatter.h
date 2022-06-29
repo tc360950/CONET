@@ -9,21 +9,20 @@
 #include "event_tree.h"
 
 class TreeFormatter {
-private:
 	using NodeHandle = EventTree::NodeHandle;
 
 	static std::string get_root_string_rep() {
 		return "(0,0)";
 	}
-    static std::string get_node_label(EventTree &tree, NodeHandle node)
-	{
-		return node == tree.get_root() ? std::string(get_root_string_rep()) : label_to_str(node->label);
+
+    static std::string get_node_label(EventTree &tree, NodeHandle node) {
+		return node == tree.get_root() ? get_root_string_rep() : label_to_str(node->label);
 	}
 
-	static void toString(EventTree &tree, NodeHandle node, std::stringstream &ss) {
+	static void to_string(EventTree &tree, NodeHandle node, std::stringstream &ss) {
 		for (auto &child : node->children) {
 			ss << get_node_label(tree, node) << "-" << get_node_label(tree, child) << "\n";
-			toString(tree, child, ss);
+			to_string(tree, child, ss);
 		}
 	}
 
@@ -41,7 +40,7 @@ private:
 public: 
 	static std::string to_string_representation(EventTree &tree) {
 		std::stringstream ss;
-		toString(tree, tree.get_root(), ss);
+		to_string(tree, tree.get_root(), ss);
 		return ss.str();
 	}
 
@@ -60,5 +59,4 @@ public:
 		return tree;
 	}
 };
-
 #endif 

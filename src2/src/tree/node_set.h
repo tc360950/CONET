@@ -41,27 +41,27 @@ public:
 
 	NodeHandle sample_node(bool withRoot, Random<Real_t> &random) {
 		size_t bound = withRoot ? nodes.size() + 1 : nodes.size();
-		size_t node = random.nextInt(bound);
+		size_t node = random.next_int(bound);
 		return node == nodes.size() ? tree.get_root() : nodes[node];
 	}
 
 	NodeHandle sample_leaf(Random<Real_t> &random) {
-		return leaves[random.nextInt(leaves.size())];
+		return leaves[random.next_int(leaves.size())];
 	}
 
 	NodeHandle sample_non_descendant(NodeHandle node, Random<Real_t> &random) {
 		auto nonDescendants = std::move(tree.get_non_descendants(node));
-		return nonDescendants[random.nextInt(nonDescendants.size())];
+		return nonDescendants[random.next_int(nonDescendants.size())];
 	}
 
 	NodeHandle sample_descendant(NodeHandle node, Random<Real_t> &random) {
 		auto descendants = std::move(tree.get_descendants(node));
-		return descendants[random.nextInt(descendants.size())];
+		return descendants[random.next_int(descendants.size())];
 	}
 
 	std::pair<NodeHandle, NodeHandle> sampleTwoNodes(Random<Real_t> &random) {
-		size_t first_node_idx = random.nextInt(nodes.size());
-		size_t second_node_idx = random.nextInt(nodes.size() - 1);
+		size_t first_node_idx = random.next_int(nodes.size());
+		size_t second_node_idx = random.next_int(nodes.size() - 1);
 		if (second_node_idx >= first_node_idx) {
 			second_node_idx++;
 		}

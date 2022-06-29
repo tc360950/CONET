@@ -72,15 +72,15 @@ template <class Real_t> class TreeSamplerCoordinator {
 
 		Real_t log_acceptance = after_move_likelihood - before_move_likelihood + move_data.reverse_move_log_kernel - move_data.move_log_kernel + std::log(move_probabilities[type]) - std::log(get_probability_of_reverse_move(type));
 
-		if (DEBUG ) logDebug("Log acceptance ratio: ", log_acceptance, " likelihood before ", before_move_likelihood, " likelihood after ", after_move_likelihood);
+		log_debug("Log acceptance ratio: ", log_acceptance, " likelihood before ", before_move_likelihood, " likelihood after ", after_move_likelihood);
 
-		if (random.logUniform() <= log_acceptance) {
+		if (random.log_uniform() <= log_acceptance) {
 			likelihood_coordinator.persist_likelihood_calculation_result();
 			tree_count_dispersion_penalty = after_move_counts_dispersion_penalty;
-			if (DEBUG) logDebug("Move accepted");
+			log_debug("Move accepted");
 		} else {
 			mh_step_executor.rollback_move(type, move_data);
-			if (DEBUG) log("Move rejected");
+			log_debug("Move rejected");
 		}
 	}
 
@@ -137,7 +137,7 @@ public:
 
 	void execute_metropolis_hastings_step() {
 		MoveType type = sample_move_type();
-		if (DEBUG) logDebug("Sampled move of type: ", moveTypeToString(type));
+		log_debug("Sampled move of type: ", moveTypeToString(type));
 		
 		if (mh_step_executor.move_is_possible(type)) {
 			move(type);

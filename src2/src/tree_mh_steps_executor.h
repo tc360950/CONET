@@ -181,7 +181,7 @@ private:
 		move_data.nodes["node1"] = nodes.first;
 		move_data.nodes["node2"] = nodes.second;
 		move_data.label = tree.get_node_label(nodes.first);
-		swap_breakpoints(nodes.first, nodes.second, random.randomIntBit(), random.randomIntBit());
+		swap_breakpoints(nodes.first, nodes.second, random.random_int_bit(), random.random_int_bit());
 		return move_data;
 	}
 

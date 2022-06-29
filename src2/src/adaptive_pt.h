@@ -30,7 +30,6 @@ template <class Real_t> class AdaptivePT {
 		return result;
 	}
 
-
 public:
 	AdaptivePT(size_t num_replicas): num_replicas{num_replicas} {
 		Real_t temp = 1.0;
@@ -48,8 +47,6 @@ public:
 		}
 		return temperatures;
 	}
-
-
 
 	void update(const std::vector<Real_t> &states) {
 		auto H_vector = get_H_vector(states);

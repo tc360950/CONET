@@ -58,7 +58,7 @@ public:
 	}
 
 	TreeLabel sample_label(Random<Real_t> &random) {
-		return unused_labels.get_nth(random.nextInt(unused_labels.size()));
+		return unused_labels.get_nth(random.next_int(unused_labels.size()));
 	}
 
 	bool has_free_labels() {

@@ -3,7 +3,6 @@
 
 
 template <class Real_t> class AdaptiveMH {
-private:
 	const Real_t epsilon = 0.0001;
 	const Real_t initial_variance = 0.0001;
 	const Real_t scaling = (1.0) * (1.0);
@@ -12,7 +11,6 @@ private:
 	Real_t var{ initial_variance };
 	Real_t average{ 0 };
 	Real_t num_observations{ 0 };
-
 
 public:
 	AdaptiveMH<Real_t>() {}
@@ -37,12 +35,4 @@ public:
 		return num_observations < init_segment ? initial_variance : scaling * var + scaling * epsilon;
 	}
 };
-
-
-
-
-
-
-
-
 #endif //ADAPTIVE_MH_H
