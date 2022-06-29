@@ -57,7 +57,6 @@ template<class Real_t> class LikelihoodCalculatorState {
 };
 
 template <class Real_t> class LikelihoodCalculator {
-private: 
     EventTree &tree;
     LikelihoodCalculatorState<Real_t> &state;
     VectorCellProvider<Real_t> &cells;

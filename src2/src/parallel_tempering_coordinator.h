@@ -48,7 +48,7 @@ template <class Real_t> class ParallelTemperingCoordinator {
 	const Real_t MIN_COMPONENT_WEIGHT = 0.01;
 
 	EventTree sample_starting_tree_for_chain() {
-		VertexLabelSampler<Real_t> vertexSet {provider.get_loci_count() - 1, provider.getChromosomeMarkers()};
+		VertexLabelSampler<Real_t> vertexSet {provider.get_loci_count() - 1, provider.get_chromosome_end_markers()};
 		return sample_tree<Real_t>(INIT_TREE_SIZE, vertexSet, random);
 	}
 
@@ -140,13 +140,11 @@ template <class Real_t> class ParallelTemperingCoordinator {
 	}
 
 	CONETInferenceResult<Real_t> choose_best_tree_among_replicas() {
-		auto best = tree_sampling_coordinators[0]->get_inferred_tree();
+		Utils::MaxValueAccumulator<CONETInferenceResult<Real_t> ,Real_t> best_tree;
 		for (auto &replica : tree_sampling_coordinators) {
-			if (replica->get_inferred_tree().likelihood > best.likelihood) {
-				best = replica->get_inferred_tree();
-			}
+			best_tree.update(replica->get_inferred_tree(), replica->get_inferred_tree().likelihood);
 		}
-		return best;
+		return best_tree.get();
 	}
 public:
 	ParallelTemperingCoordinator(VectorCellProvider<Real_t> &provider, Random<Real_t> &random): 
@@ -157,9 +155,7 @@ public:
 
 
 	CONETInferenceResult<Real_t> simulate(size_t iterations_parameters, size_t iterations_pt) {
-		auto parameters_MAP = estimate_likelihood_parameters(prepare_initial_likelihood_parameters(), iterations_parameters);
-		random.nextInt();// mozesz usuanc pozniej
-		prepare_sampling_services(parameters_MAP);
+		prepare_sampling_services(estimate_likelihood_parameters(prepare_initial_likelihood_parameters(), iterations_parameters));
 		mcmc_simulation(iterations_pt);
 		return choose_best_tree_among_replicas();
 	}

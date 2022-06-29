@@ -62,7 +62,7 @@ public:
 	}
 
 
-	std::vector<size_t> getChromosomeMarkers() {
+	std::vector<size_t> get_chromosome_end_markers() {
 		return this->chromosome_markers;
 	}
 

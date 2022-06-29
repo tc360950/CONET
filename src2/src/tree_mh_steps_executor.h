@@ -211,14 +211,15 @@ public:
 
     MHStepsExecutor<Real_t>(EventTree &t, VectorCellProvider<Real_t> &cells, Random<Real_t> &r): 
 			tree{t}, 
-			label_sampler{cells.get_loci_count() - 1, cells.getChromosomeMarkers()}, 
+			label_sampler{cells.get_loci_count() - 1, cells.get_chromosome_end_markers()}, 
 			node_sampler{tree}, 
 			cells {cells}, 
-			random{r} {
-				for (auto event : tree.get_all_events()) {
-					label_sampler.add_label(event);
-				}
-			}
+			random{r} 
+	{
+		for (auto event : tree.get_all_events()) {
+			label_sampler.add_label(event);
+		}
+	}
 
 	void rollback_move(MoveType type, MoveData &move_data) {
 		switch (type) {
