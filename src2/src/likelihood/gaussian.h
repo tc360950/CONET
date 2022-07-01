@@ -13,6 +13,7 @@ namespace Gauss {
 	public:
 		Real_t mean;
 		Real_t sd;
+	private:
 		Random<Real_t> &random;
 		AdaptiveMH<Real_t> adaptiveMHMean; 
 		AdaptiveMH<Real_t> adaptiveMHVariance; 
@@ -36,7 +37,11 @@ namespace Gauss {
 	public:
 		Gaussian(Real_t mean, Real_t sd, Random<Real_t> &random) : mean {mean}, sd {sd}, random {random} {}
 
-
+		Gaussian(const Gaussian<Real_t> &g) : random{g.random} {
+			this->mean = g.mean;
+			this->sd = g.sd;
+		}
+		
 		void fill_matrix_log_likelihood(std::vector<std::vector<Real_t>> &matrix, const std::vector<std::vector<Real_t>> &sample) const {
 			if (THREADS_LIKELIHOOD > 1) {
 				fill_matrix_log_likelihood_parallelized(matrix, sample);
@@ -68,11 +73,6 @@ namespace Gauss {
 			return std::make_pair(1.0, 1.0);
 		}
 
-		Gaussian(const Gaussian<Real_t> &g) : random{g.random} {
-			this->mean = g.mean;
-			this->sd = g.sd;
-		}
-
 		Gaussian<Real_t>& operator = (const Gaussian<Real_t> &g) {
 			this->mean = g.mean;
 			this->sd = g.sd;
@@ -87,12 +87,5 @@ namespace Gauss {
         }
 	};
 }
-
-
-
-
-
-
-
 
 #endif

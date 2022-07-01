@@ -12,7 +12,7 @@ enum MoveType {
 	SWAP_ONE_BREAKPOINT
 };
 
-std::string moveTypeToString(MoveType type);
+std::string move_type_to_string(MoveType type);
 
 #endif // !MOVE_TYPE_H
 

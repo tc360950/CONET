@@ -5,7 +5,7 @@
 #include <map>
 
 #include "utils/log_sum_accumulator.h"
-#include "cell_provider/vector_cell_provider.h"
+#include "input_data/input_data.h"
 #include "tree/event_tree.h"
 #include "likelihood/likelihood_data.h"
 #include "utils/random.h"
@@ -27,7 +27,7 @@ template<class Real_t> class LikelihoodCoordinator {
 	LikelihoodData<Real_t> likelihood;
 
 	EventTree &tree;
-	VectorCellProvider<Real_t> &cells;
+	CONETInputData<Real_t> &cells;
 	Random<Real_t> random;
 	CountsDispersionPenalty<Real_t> counts_scoring;
 	size_t step {0};
@@ -64,7 +64,7 @@ template<class Real_t> class LikelihoodCoordinator {
 
 
 public:
-	LikelihoodCoordinator(LikelihoodData<Real_t> lk, EventTree &tree, VectorCellProvider<Real_t> &cells, unsigned int seed): 
+	LikelihoodCoordinator(LikelihoodData<Real_t> lk, EventTree &tree, CONETInputData<Real_t> &cells, unsigned int seed): 
 					calculator_state{cells.get_cells_count()}, 
 					tmp_calculator_state{cells.get_cells_count()}, 
 					likelihood_matrices{cells.get_loci_count(), cells.get_cells_count()},
@@ -130,7 +130,6 @@ public:
 			log_debug("Rejecting parameters change");
 		}
 	}
-
 };
 #endif // !LIKELIHOOD_COORD_H
 

@@ -3,9 +3,10 @@
 #include <cstdlib>
 #include <tuple>
 #include <chrono>
+#include <fstream>
 
 #include "src/tree/event_tree.h"
-#include "src/cell_provider/csv_reader/csv_reader.h"
+#include "src/input_data/csv_reader.h"
 #include "src/tree_sampler_coordinator.h"
 #include "src/utils/random.h"
 #include "src/parallel_tempering_coordinator.h"
@@ -57,13 +58,13 @@ int main(int argc, char **argv) {
 	USE_EVENT_LENGTHS_IN_ATTACHMENT = vm["use_event_lengths_in_attachment"].as<bool>();
 	SEED = vm["seed"].as<int>();
 	MIXTURE_SIZE = vm["mixture_size"].as<size_t>();
-	THREADS_NUM = vm["num_replicas"].as<size_t>();
+	NUM_REPLICAS = vm["num_replicas"].as<size_t>();
 	THREADS_LIKELIHOOD = vm["threads_likelihood"].as<size_t>();
     VERBOSE = vm["verbose"].as<bool>();
     NEUTRAL_CN = vm["neutral_cn"].as<double>();
 
 	Random<double> random(SEED);
-    VectorCellProvider<double> provider = create_from_file(string(data_dir).append("ratios"), string(data_dir).append("counts"), string(data_dir).append("counts_squared"), ';');
+    CONETInputData<double> provider = create_from_file(string(data_dir).append("ratios"), string(data_dir).append("counts"), string(data_dir).append("counts_squared"), ';');
     
     log("Input files have been loaded successfully");
     ParallelTemperingCoordinator<double> PT(provider, random);

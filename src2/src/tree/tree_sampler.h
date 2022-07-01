@@ -4,7 +4,7 @@
 
 #include "event_tree.h"
 #include "./vertex_label_sampler.h"
-#include "./node_set.h"
+#include "./tree_node_sampler.h"
 #include "../utils/random.h"
 
 template <class Real_t> EventTree sample_tree(const size_t tree_size, VertexLabelSampler<Real_t> &vertex_label_set, Random<Real_t> &random) {

@@ -2,7 +2,7 @@
 #define COUNTS_SCORING_H
 
 #include "event_tree.h"
-#include "../cell_provider/vector_cell_provider.h"
+#include "../input_data/input_data.h"
 #include "../parameters/parameters.h"
 
 
@@ -108,7 +108,6 @@ private:
 		}
 	}
 
-
     Real_t calculate_penalty_for_non_root_bins(EventTree::NodeHandle node, std::map<Event, std::set<size_t>> &attachment) {
 		Real_t result = 0.0;
 		auto node_cache_id = cache_id;
@@ -149,9 +148,7 @@ private:
 		return COUNTS_SCORE_CONSTANT_1 * calculate_l2_penalty(NEUTRAL_CN, counts_sum, squared_counts_sum, bin_count, all_bins_count);
 	}
 
-	/**
-	 * @brief Initialize state used for calculations
-	 */
+	//Initialize state used for calculations
 	void init_state() {
 		if (clusters_cache.size() > DEFAULT_CACHE_SIZE) {
 			clusters_cache.resize(DEFAULT_CACHE_SIZE);
@@ -173,9 +170,11 @@ private:
 		}
 		return - (result + calculate_penalty_for_bins_at_root());
 	}
-
 public:
-	CountsDispersionPenalty<Real_t>(VectorCellProvider<Real_t> &cells): sum_counts {cells.get_summed_counts()}, squared_counts{cells.get_squared_counts()}, counts_score_length_of_bin{cells.get_counts_scores_regions()} {
+	CountsDispersionPenalty<Real_t>(CONETInputData<Real_t> &cells):
+	 	sum_counts {cells.get_summed_counts()}, 
+	 	squared_counts{cells.get_squared_counts()}, 
+		counts_score_length_of_bin{cells.get_counts_scores_regions()} {
 
 		event_clusters.resize(cells.get_loci_count());
 

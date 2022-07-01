@@ -100,7 +100,7 @@ template <class Real_t> class TreeSamplerCoordinator {
 
 
 public:
-	TreeSamplerCoordinator(EventTree &tree, LikelihoodCoordinator<Real_t> &lC, unsigned int seed, VectorCellProvider<Real_t> &cells, std::map<MoveType, Real_t> move_probabilities): 
+	TreeSamplerCoordinator(EventTree &tree, LikelihoodCoordinator<Real_t> &lC, unsigned int seed, CONETInputData<Real_t> &cells, std::map<MoveType, Real_t> move_probabilities): 
 		tree{ tree }, 
 		likelihood_coordinator{ lC }, 
 		dispersion_penalty_calculator{ cells },
@@ -137,7 +137,7 @@ public:
 
 	void execute_metropolis_hastings_step() {
 		MoveType type = sample_move_type();
-		log_debug("Sampled move of type: ", moveTypeToString(type));
+		log_debug("Sampled move of type: ", move_type_to_string(type));
 		
 		if (mh_step_executor.move_is_possible(type)) {
 			move(type);

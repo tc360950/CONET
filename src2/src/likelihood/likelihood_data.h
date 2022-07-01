@@ -1,13 +1,14 @@
-#ifndef NORMAL_MIXTURE_LIKELIHOOD_H
-#define NORMAL_MIXTURE_LIKELIHOOD_H
-#include <utility>
-#include <fstream>
+#ifndef LIKELIHOOD_DATA_H
+#define LIKELIHOOD_DATA_H
 
 #include "gaussian_utils.h"
 #include "gaussian_mixture.h"
 #include "gaussian.h"
 
 
+/**
+ * @brief Represents matrices of diffs likelihood for breakpoint and no-breakpoint loci 
+ */
 template <class Real_t> class LikelihoodData {
 public:
 	Gauss::Gaussian<Real_t> no_brkp_likelihood;
@@ -47,4 +48,4 @@ public:
 	}
 };
 
-#endif // !NORMAL_MIXTURE_LIKELIHOOD_H
+#endif // !LIKELIHOOD_DATA_H

@@ -6,7 +6,7 @@
 #include <map>
 
 #include "utils/log_sum_accumulator.h"
-#include "cell_provider/vector_cell_provider.h"
+#include "input_data/input_data.h"
 #include "parameters/parameters.h"
 #include "tree/event_tree.h"
 #include "tree/attachment.h"
@@ -59,7 +59,7 @@ template<class Real_t> class LikelihoodCalculatorState {
 template <class Real_t> class LikelihoodCalculator {
     EventTree &tree;
     LikelihoodCalculatorState<Real_t> &state;
-    VectorCellProvider<Real_t> &cells;
+    CONETInputData<Real_t> &cells;
     LikelihoodMatrices<Real_t> &likelihood_matrices;
 
     using NodeHandle = EventTree::NodeHandle;
@@ -149,7 +149,7 @@ template <class Real_t> class LikelihoodCalculator {
 	}
 
 public:
-    LikelihoodCalculator<Real_t>(EventTree &tree, LikelihoodCalculatorState<Real_t> &state, VectorCellProvider<Real_t> &cells, LikelihoodMatrices<Real_t> &matrices): 
+    LikelihoodCalculator<Real_t>(EventTree &tree, LikelihoodCalculatorState<Real_t> &state, CONETInputData<Real_t> &cells, LikelihoodMatrices<Real_t> &matrices): 
                                             tree {tree}, state{state}, cells{cells}, likelihood_matrices{matrices} {}
 
     Real_t calculate_likelihood() {

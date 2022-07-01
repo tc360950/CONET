@@ -22,7 +22,4 @@ class CONETParameters:
     output_dir: str = "./"
 
     def to_arg_value_pairs(self) -> List[Tuple[str, str]]:
-        dict_ = dataclasses.asdict(self)
-        dict_["verbose"] = "true" if self.verbose else "false"
-        dict_["use_event_lengths_in_attachment"] = "true" if self.use_event_lengths_in_attachment else "false"
-        return [(f"--{key}", f"{value}") for key, value in dict_.items()]
+        return [(f"--{key}", f"{value}") for key, value in dataclasses.asdict(self).items()]

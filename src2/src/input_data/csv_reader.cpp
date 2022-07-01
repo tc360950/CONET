@@ -8,7 +8,7 @@
 #include "csv_reader.h" 
 
 /**
- * @brief Split files by delimiter 
+ * @brief Split file by delimiter 
  * 
  * @param path Path to file
  * @param delimiter 
@@ -22,8 +22,7 @@ std::vector<std::vector<std::string>> split_file_by_delimiter(std::string path, 
 	std::vector<std::string> line_placeholder;
 	std::string buffer, line;
 
-	while (getline(file, line))
-	{
+	while (getline(file, line)) {
 		std::istringstream f(line);
 		while (getline(f, buffer, delimiter)) {
 			line_placeholder.push_back(buffer);
@@ -62,16 +61,20 @@ std::vector<size_t> get_chromosome_markers(std::vector<double> chromosomes) {
 	return result;
 }
 
-VectorCellProvider<double> diff_matrix_to_cell_provider(std::vector<std::vector<double>> data) {
-	VectorCellProvider<double> provider(data[0].size(), get_chromosome_markers(data[0]), data[1]);
-	for (size_t i = 2; i < data.size(); i++) {
+CONETInputData<double> diff_matrix_to_cell_provider(std::vector<std::vector<double>> data) {
+	const size_t CHROMOSOME_ROW = 0;
+	const size_t BETWEEN_BINS_LENGTH_ROW = 1;
+	const size_t DIFFS_START_ROW = 2;
+
+	CONETInputData<double> provider(data[0].size(), get_chromosome_markers(data[CHROMOSOME_ROW]), data[BETWEEN_BINS_LENGTH_ROW]);
+	for (size_t i = DIFFS_START_ROW; i < data.size(); i++) {
 		std::for_each(data[i].begin(), data[i].end(), [](double &r){r = -std::abs(r);});  
 		provider.post_cell(data[i]);
 	}
 	return provider;
 }
 
-void read_counts_penalty_files(VectorCellProvider<double> &provider, std::string summed_counts_path, std::string squared_counts_path, char delimiter) {
+void read_counts_penalty_files(CONETInputData<double> &provider, std::string summed_counts_path, std::string squared_counts_path, char delimiter) {
 	auto summed_counts = string_matrix_to_double(split_file_by_delimiter(summed_counts_path, delimiter));
 	auto squared_counts = string_matrix_to_double(split_file_by_delimiter(squared_counts_path, delimiter));
 	auto regions_sizes = summed_counts[0];
@@ -80,8 +83,8 @@ void read_counts_penalty_files(VectorCellProvider<double> &provider, std::string
 	provider.post_counts_dispersion_data(regions_sizes, summed_counts, squared_counts);
 }
 
-VectorCellProvider<double> create_from_file(std::string path, std::string summed_counts_path, std::string squared_counts_path, char delimiter) {
-	VectorCellProvider<double> provider = diff_matrix_to_cell_provider(string_matrix_to_double(split_file_by_delimiter(path, delimiter)));
+CONETInputData<double> create_from_file(std::string path, std::string summed_counts_path, std::string squared_counts_path, char delimiter) {
+	CONETInputData<double> provider = diff_matrix_to_cell_provider(string_matrix_to_double(split_file_by_delimiter(path, delimiter)));
 	read_counts_penalty_files(provider, summed_counts_path, squared_counts_path, delimiter);
 	return provider;
 }

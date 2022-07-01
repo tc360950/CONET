@@ -1,14 +1,14 @@
-#ifndef BASIC_VERTEX_SET_H
-#define BASIC_VERTEX_SET_H
+#ifndef VERTEX_SAMPLER_H
+#define VERTEX_SAMPLER_H
 #include <algorithm>
 
 #include "../utils/random.h"
 #include "../utils/logger/logger.h"
 #include "./utils/event_container.h"
+
 /**
-* Implementation of VertexSetInterface for mode in which labels with same breakpoints are allowed.
-*
-*/
+ * This class is responsible for sampling labels for new tree vertices
+ */
 template <class Real_t> class VertexLabelSampler {
 private:
 	Locus max_loci;
@@ -38,19 +38,19 @@ private:
 	}
 
 public:
-	VertexLabelSampler(size_t maxBrkp, std::vector<size_t> chromosomeMarkers) : 
-		max_loci{ maxBrkp }, 
-		unused_labels{ maxBrkp }, 
-		chromosome_end_markers{chromosomeMarkers} {
+	VertexLabelSampler(size_t max_loci, std::vector<size_t> chr_markers) : 
+		max_loci{ max_loci }, 
+		unused_labels{ max_loci }, 
+		chromosome_end_markers{chr_markers} {
 		init();
 	}
 
-	void add_label(TreeLabel brkp) {
-		unused_labels.erase(brkp);
+	void add_label(TreeLabel l) {
+		unused_labels.erase(l);
 	}
 
-	void remove_label(TreeLabel brkp) {
-		unused_labels.insert(brkp);
+	void remove_label(TreeLabel l) {
+		unused_labels.insert(l);
 	}
 
 	Real_t get_sample_label_log_kernel() {
@@ -65,21 +65,21 @@ public:
 		return !unused_labels.empty();
 	}
 
-	std::pair<Event, Event> swapOneBreakpoint(Event brkp1, Event brkp2, int left, int right) {
-		auto newBrkps = swapBreakpoints(brkp1, brkp2, left, right);
-		remove_label(brkp1);
-		remove_label(brkp2);
-		add_label(newBrkps.first);
-		add_label(newBrkps.second);
-		return newBrkps;
+	std::pair<Event, Event> swap_one_breakpoint(Event ev1, Event ev2, int left, int right) {
+		auto new_events = swap_breakpoints(ev1, ev2, left, right);
+		remove_label(ev1);
+		remove_label(ev2);
+		add_label(new_events.first);
+		add_label(new_events.second);
+		return new_events;
 	}
 
-	bool swapOneBreakpointPossible(Event brkp1, Event brkp2, int left, int right) {
-		auto newBrkps = swapBreakpoints(brkp1, brkp2, left, right);
+	bool can_swap_one_breakpoint(Event brkp1, Event brkp2, int left, int right) {
+		auto newBrkps = swap_breakpoints(brkp1, brkp2, left, right);
 		return is_valid_event(newBrkps.first) && is_valid_event(newBrkps.second)
 			&& unused_labels.find(newBrkps.first)
 			&& unused_labels.find(newBrkps.second);
 	}
 };
 
-#endif // !BASIC_VERTEX_SET_H
+#endif // !VERTEX_SAMPLER_H

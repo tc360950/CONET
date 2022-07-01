@@ -1,5 +1,5 @@
-#ifndef POINTER_TREE_H
-#define POINTER_TREE_H
+#ifndef EVENT_TREE_H
+#define EVENT_TREE_H
 #include <list>
 #include <cassert>
 #include <unordered_set>
@@ -14,11 +14,11 @@
 #include "../utils/logger/logger.h"
 
 /**
- * @brief 
+ * @brief Class representing CONET 
  * 
+ * Rooted tree with arbitrary degree.
  */
-class EventTree
-{
+class EventTree {
 public:
 	class Node
 	{
@@ -26,9 +26,7 @@ public:
 		Node *parent;
 		std::list<Node *> children;
 		TreeLabel label;
-		/**
-		 * Loci which are breakpoints in this node, and are not present in any ancestor nodes
-		 */
+		// Loci which are breakpoints in this node and are not present in any ancestor nodes
 		std::list<Locus> new_breakpoints;
 		Node() : parent{nullptr} {}
 		Node(TreeLabel label, std::list<Locus> nb) : parent{nullptr}, children {},  label{label}, new_breakpoints{nb} {}
@@ -48,121 +46,106 @@ private:
 	EventTree::Node *root;
 	using NodeVector = std::vector<NodeHandle>;
 
-	NodeHandle create_detached_node(TreeLabel label)
-	{
+	NodeHandle create_detached_node(TreeLabel label) {
 		return new Node(label, get_event_breakpoints(get_event_from_label(label)));
 	}
 
-	void gather_ancestor_breakpoints(Node *node, std::unordered_set<Locus> &breakpoints) const
-	{
-		if (node != root)
-		{
-			for (Locus l : get_event_breakpoints(get_event_from_label(node->label)))
-			{
+	void gather_ancestor_breakpoints(Node *node, std::unordered_set<Locus> &breakpoints) const {
+		if (node != root) {
+			for (Locus l : get_event_breakpoints(get_event_from_label(node->label))) {
 				breakpoints.insert(l);
 			}
 			gather_ancestor_breakpoints(node->parent, breakpoints);
 		}
 	}
 
-	void update_new_breakpoints(NodeHandle node, std::unordered_set<size_t> &breakpoints_from_ancestors)
-	{
-		if (node != root)
-		{
+	/**
+	 * Update @new_breakpoints list for nodes in subtree rooted at @node 
+	 * 
+	 * @param node - subtree rott
+	 * @param breakpoints_from_ancestors - all breakpoints from ancestors of @node
+	 */
+	void update_new_breakpoints(NodeHandle node, std::unordered_set<size_t> &breakpoints_from_ancestors) {
+		if (node != root) {
 			node->new_breakpoints = get_event_breakpoints(get_event_from_label(node->label));
 			node->new_breakpoints.remove_if([&breakpoints_from_ancestors](Locus br)
 											{ return breakpoints_from_ancestors.find(br) != breakpoints_from_ancestors.end(); });
 		}
 		breakpoints_from_ancestors.insert(node->new_breakpoints.begin(), node->new_breakpoints.end());
 		
-		for (auto ch : node->children)
-		{
+		for (auto ch : node->children) {
 			update_new_breakpoints(ch, breakpoints_from_ancestors);
 		}
-		for (auto br : node->new_breakpoints)
-		{
+		for (auto br : node->new_breakpoints) {
 			breakpoints_from_ancestors.erase(br);
 		}
 	}
 
-	void update_new_breakpoints(NodeHandle subtreeRoot)
-	{
+	void update_new_breakpoints(NodeHandle subtree_root) {
 		std::unordered_set<Locus> found_breakpoints;
-		if (subtreeRoot->parent != nullptr)
-		{
-			gather_ancestor_breakpoints(subtreeRoot->parent, found_breakpoints);
+		if (subtree_root->parent != nullptr) {
+			gather_ancestor_breakpoints(subtree_root->parent, found_breakpoints);
 		}
-		update_new_breakpoints(subtreeRoot, found_breakpoints);
+		update_new_breakpoints(subtree_root, found_breakpoints);
 	}
 
-	void collect_subtree_nodes(NodeHandle node, NodeVector &nodes) const
-	{
+	void collect_subtree_nodes(NodeHandle node, NodeVector &nodes) const {
 		nodes.push_back(node);
-		for (auto &child : node->children)
-		{
+		for (auto &child : node->children) {
 			collect_subtree_nodes(child, nodes);
 		}
 	}
 
-	void detach_node(NodeHandle node)
-	{
+	void detach_node(NodeHandle node) {
 		node->parent->children.remove(node);
 		node->parent = nullptr;
 	}
 
-	void attach_node(NodeHandle node, NodeHandle attach_to)
-	{
+	void attach_node(NodeHandle node, NodeHandle attach_to) {
 		node->parent = attach_to;
 		attach_to->children.push_back(node);
 	}
 
-	void copy_subtree(NodeHandle parent, NodeHandle treeRoot)
-	{
-		NodeHandle newNode = create_detached_node(treeRoot->label);
-		attach_node(newNode, parent);
-		for (auto child : treeRoot->children)
-		{
-			copy_subtree(newNode, child);
+	/**
+	 * @brief Attach copy of subtree rooted at @tree_root to @parent
+	 */
+	void copy_subtree(NodeHandle parent, NodeHandle tree_root) {
+		NodeHandle new_node = create_detached_node(tree_root->label);
+		attach_node(new_node, parent);
+		for (auto child : tree_root->children) {
+			copy_subtree(new_node, child);
 		}
 	}
 
 public:
-	EventTree(const EventTree &tree)
-	{
+	EventTree(const EventTree &tree) {
 		this->size = tree.size;
 		root = new Node();
-		for (auto child : tree.root->children)
-		{
+		for (auto child : tree.root->children) {
 			copy_subtree(root, child);
 		}
 		update_new_breakpoints(root);
 	}
 
-	EventTree &operator=(const EventTree &tree)
-	{
+	EventTree &operator=(const EventTree &tree) {
 		this->size = tree.size;
-		if (root != nullptr)
-		{
+		if (root != nullptr) {
 			delete root;
 		}
 		root = new Node();
-		for (auto child : tree.root->children)
-		{
+		for (auto child : tree.root->children) {
 			copy_subtree(root, child);
 		}
 		update_new_breakpoints(root);
 		return *this;
 	}
 
-	EventTree()
-	{
+	EventTree()	{
 		root = new Node();
 	}
 
-	~EventTree()
-	{
-		if (root != nullptr)
-		{
+	~EventTree() {
+		if (root != nullptr) {
 			delete root;
 		}
 	}
@@ -179,9 +162,6 @@ public:
 
 	std::list<Locus> const &get_new_breakpoints(const NodeHandle node) const { return node->new_breakpoints; }
 
-	/**
-	 * @brief Get event represented by node @node
-	 */
 	Event get_node_event(const NodeHandle node) const { return get_event_from_label(node->label); }
 
 	TreeLabel get_node_label(const NodeHandle node) const { return node->label; }
@@ -194,35 +174,28 @@ public:
 	int get_nodes_relation(NodeHandle node1, NodeHandle node2) const
 	{
 		auto node = node1->parent;
-		while (node != nullptr)
-		{
+		while (node != nullptr) {
 			if (node2 == node)
 				return -1;
-			else
-				node = node->parent;
+			node = node->parent;
 		}
 		node = node2->parent;
-		while (node != nullptr)
-		{
+		while (node != nullptr) {
 			if (node1 == node)
 				return 1;
-			else
-				node = node->parent;
+			node = node->parent;
 		}
 		return 0;
 	}
 
 	/**
 	 * @brief Returns nodes which are not descendants of node @node, root is included.  
-	 * 
-	 * @return std::vector<NodeHandle> - vector of nodes which are not contained in subtree rooted at @node
 	 */
 	std::vector<NodeHandle> get_non_descendants(NodeHandle node) const
 	{
 		std::vector<NodeHandle> all_nodes = get_descendants(root);
 		std::list<NodeHandle> non_descendants{all_nodes.begin(), all_nodes.end()};
-		for (auto d : get_descendants(node))
-		{
+		for (auto d : get_descendants(node)) {
 			non_descendants.remove(d);
 		}
 		return std::vector<NodeHandle>(non_descendants.begin(), non_descendants.end());
@@ -231,18 +204,13 @@ public:
 	/**
 	 *	@brief Returns all nodes from subtree rooted at @node. The order is arbitrary
 	*/
-	std::vector<NodeHandle> get_descendants(NodeHandle node) const
-	{
+	std::vector<NodeHandle> get_descendants(NodeHandle node) const {
 		std::vector<NodeHandle> result;
 		collect_subtree_nodes(node, result);
 		return result;
 	}
 
-	/**
-	 * @brief Collect all events from the tree.
-	 */
-	std::vector<Event> get_all_events() const
-	{
+	std::vector<Event> get_all_events() const {
 		auto nodes = get_descendants(root);
 		nodes.erase(std::remove_if(nodes.begin(), nodes.end(), [this](NodeHandle n)
 								   { return n == this->root; }));
@@ -255,16 +223,13 @@ public:
 	/**
 	 * @brief Recursively removes leaves of subtree rooted at @node which have no attached cell.
 	 */
-	void prune_tree(NodeHandle node, Attachment &attachment)
-	{
+	void prune_tree(NodeHandle node, Attachment &attachment) {
 		// Node children may be modified while traversing it, that's why we iterate on copy
 		auto node_children_copy = node->children; 
-		for (auto child : node_children_copy)
-		{
+		for (auto child : node_children_copy) {
 			prune_tree(child, attachment);
 		}
-		if (node->children.empty() && !attachment.has_attached_cells(node->label))
-		{
+		if (node->children.empty() && !attachment.has_attached_cells(node->label)) {
 			this->delete_leaf(node);
 		}
 	}
@@ -281,13 +246,12 @@ public:
 	 * @param label label for new node
 	 * @return NodeHandle - handle to new node
 	 */
-	NodeHandle add_leaf(NodeHandle parent, TreeLabel label)
-	{
-		Node *newNode = create_detached_node(label);
-		attach_node(newNode, parent);
-		update_new_breakpoints(newNode);
+	NodeHandle add_leaf(NodeHandle parent, TreeLabel label) {
+		Node *new_node = create_detached_node(label);
+		attach_node(new_node, parent);
+		update_new_breakpoints(new_node);
 		size++;
-		return newNode;
+		return new_node;
 	}
 
 	/**
@@ -297,8 +261,7 @@ public:
 	 * @param node_to_attach - detached subtree will be attached to this node
 	 * @return NodeHandle - old parent of reattached node
 	 */
-	NodeHandle prune_and_reattach(NodeHandle node_to_prune, NodeHandle node_to_attach)
-	{
+	NodeHandle prune_and_reattach(NodeHandle node_to_prune, NodeHandle node_to_attach) {
 		NodeHandle parent = node_to_prune->parent;
 		detach_node(node_to_prune);
 		attach_node(node_to_prune, node_to_attach);
@@ -312,8 +275,7 @@ public:
 	 * @param node1 - will be given label of node @node2
 	 * @param node2 - will be given label of node @node1
 	 */
-	void swap_labels(NodeHandle node1, NodeHandle node2)
-	{
+	void swap_labels(NodeHandle node1, NodeHandle node2) {
 		std::swap(node1->label, node2->label);
 		update_new_breakpoints(node1);
 		update_new_breakpoints(node2);
@@ -325,8 +287,7 @@ public:
 	 * @param node - leaf of the tree which should be deleted.
 	 * @return NodeHandle - parent of the deleted leaf
 	 */
-	NodeHandle delete_leaf(NodeHandle node)
-	{
+	NodeHandle delete_leaf(NodeHandle node) {
 		auto parent = node->parent;
 		detach_node(node);
 		size--;
@@ -338,8 +299,7 @@ public:
 	 * @brief Changes label of node @node 
 	 * Whether this will not result in node label duplication is up to the caller.  
 	 */
-	void change_label(NodeHandle node, Event new_label)
-	{
+	void change_label(NodeHandle node, Event new_label) {
 		node->label = new_label;
 		update_new_breakpoints(node);
 	}
@@ -349,8 +309,7 @@ public:
 	 * 
 	 * It is assumed that @root1 is not a descendant of @root2 and vice versa.
 	 */
-	void swap_subtrees_non_descendants(NodeHandle root1, NodeHandle root2)
-	{
+	void swap_subtrees_non_descendants(NodeHandle root1, NodeHandle root2) {
 		auto parent1 = root1->parent;
 		auto parent2 = root2->parent;
 		detach_node(root1);
@@ -366,8 +325,7 @@ public:
 	 * It is assumed that @descendant is a descendant of @parent and @descendant_of_descendant is a descendant of @descendant. 
 	 * Subtree rooted at @descendant will be attached to parent of @parent. The remaining subtree rooted at @parent will be attached to @descendant_of_descendant. 
 	 */
-	void swap_subtrees_descendants(NodeHandle parent, NodeHandle descendant, NodeHandle descendant_of_descendant)
-	{
+	void swap_subtrees_descendants(NodeHandle parent, NodeHandle descendant, NodeHandle descendant_of_descendant) {
 		detach_node(descendant);
 		attach_node(descendant, parent->parent);
 		detach_node(parent);
@@ -375,4 +333,4 @@ public:
 		update_new_breakpoints(descendant);
 	}
 };
-#endif // !POINTER_TREE_H
+#endif // !EVENT_TREE_H

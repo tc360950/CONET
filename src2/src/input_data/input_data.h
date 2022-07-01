@@ -1,17 +1,16 @@
 #ifndef VECTOR_CELL_PROVIDER_H
 #define VECTOR_CELL_PROVIDER_H
 #include <vector>
-#include <map>
+#include <numeric>
 
 #include "../types.h"
 
 /**
 * Container for CONET input data
-* Stores 2D matrix of corrected counts - [i,j] indices 
-* corresponds to i-th bin count of j-th cell
-* And two matrices for calculation of count dispersion penlty. 
+* Stores 2D matrix of corrected counts ([i,j corresponds to i-th bin count of j-th cell)
+* and two matrices for calculation of count dispersion penalty. 
 */
-template <class Real_t> class VectorCellProvider {
+template <class Real_t> class CONETInputData {
 private:
 	const size_t loci_count;
 	size_t cell_count{ 0 };
@@ -20,7 +19,6 @@ private:
 	* For pair of breakpoints (br1, br2) length of event (br1, br2) 
 	* is equal to eventLengths[br1] - eventLengths[br2]
 	*/
-    
     std::vector<Real_t> between_bins_lengths;
 	/**
 	* Contains indices of first breakpoint from each chromosome (expcept for the first one) and loci_count as a last element;
@@ -29,12 +27,15 @@ private:
 
 
 	std::vector<Real_t> counts_scores_regions; // Records sizes of segments between consecutive breakpoint candidate loci
-	std::vector<std::vector<Real_t>> summed_counts;
-	std::vector<std::vector<Real_t>> squared_counts;
+	std::vector<std::vector<Real_t>> summed_counts; // Sums of CCs between consecutive breakpoint candidate loci
+	std::vector<std::vector<Real_t>> squared_counts; // Sums of squared CCs between consecutive breakpoint candidate loci
 public:
 
-	VectorCellProvider(size_t loci_count, std::vector<size_t> chrom_m, std::vector<Real_t> between) : loci_count{ loci_count }, chromosome_markers {chrom_m},  between_bins_lengths { between } {
-	}
+	CONETInputData(size_t loci_count, std::vector<size_t> chrom_m, std::vector<Real_t> between): 
+				loci_count{ loci_count }, 
+				chromosome_markers {chrom_m},  
+				between_bins_lengths { between } 
+				{}
 
 	void post_cell(std::vector<Real_t> &cell) {
 		for (size_t i = 0; i < cell.size(); i++) {
@@ -62,7 +63,7 @@ public:
 	}
 
 
-	std::vector<size_t> get_chromosome_end_markers() {
+	std::vector<size_t> get_chromosome_end_markers() const {
 		return this->chromosome_markers;
 	}
 
@@ -75,13 +76,7 @@ public:
 	size_t get_loci_count() const { return loci_count; }
 
 	Real_t get_event_length(Event event) const {
-        size_t start_locus = get_event_start_locus(event);
-        Real_t result = 0.0;
-        while(start_locus < get_event_end_locus(event)) {
-            result += between_bins_lengths[start_locus];
-            start_locus++;
-        }
-		return result;
+		return std::accumulate(between_bins_lengths.begin() + get_event_start_locus(event), between_bins_lengths.begin() + get_event_end_locus(event), (Real_t) 0.0);
 	}
 };
 #endif // !VECTOR_CELL_PROVIDER_H

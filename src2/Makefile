@@ -17,8 +17,8 @@ logger.o: src/utils/logger/logger.h
 	$(CC) $(CPPFLAGS) -c src/utils/logger/logger.cpp 
 types.o: src/types.h
 	$(CC) $(CPPFLAGS) -c src/types.cpp
-csv_reader.o: src/cell_provider/csv_reader/csv_reader.h
-	$(CC) $(CPPFLAGS) -c src/cell_provider/csv_reader/csv_reader.cpp
+csv_reader.o: src/input_data/csv_reader.h
+	$(CC) $(CPPFLAGS) -c src/input_data/csv_reader.cpp
 move_type.o: src/moves/move_type.h
 	$(CC) $(CPPFLAGS) -c src/moves/move_type.cpp
 clean:

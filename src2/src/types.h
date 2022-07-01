@@ -10,7 +10,7 @@ using Locus = size_t;
 using Event = std::pair<Locus, Locus>;
 using TreeLabel = Event;
 
-std::pair<Event, Event> swapBreakpoints(Event brkp1, Event brkp2, int left, int right);
+std::pair<Event, Event> swap_breakpoints(Event brkp1, Event brkp2, int left, int right);
 
 inline Locus get_event_start_locus(Event event) {
 	return event.first;

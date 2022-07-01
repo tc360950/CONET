@@ -47,9 +47,6 @@ class EventContainer {
 	}
 
 public:
-	/**
-	* @param maxBrkp - maximal (inclusive) value for pair coordinates. 
-	*/
 	EventContainer(size_t max_locus) : max_locus{ max_locus } {
 		init();
 	}
@@ -89,5 +86,4 @@ public:
 		return result;
 	}
 };
-
 #endif // !EVENT_CONTAINER_H

@@ -9,7 +9,7 @@
 #include <mutex>
 #include <utility>
 
-#include "cell_provider/vector_cell_provider.h"
+#include "input_data/input_data.h"
 #include "likelihood/gaussian_mixture.h"
 #include "moves/move_type.h"
 #include "tree/tree_sampler.h"
@@ -28,7 +28,7 @@
 template <class Real_t> class ParallelTemperingCoordinator {
 	AdaptivePT<Real_t> adaptive_pt;
 	std::vector<Real_t> temperatures;
-	VectorCellProvider<Real_t> &provider;
+	CONETInputData<Real_t> &provider;
 	Random<Real_t> &random;
 	std::vector<EventTree> trees;
 	std::vector<std::unique_ptr<TreeSamplerCoordinator<Real_t>>> tree_sampling_coordinators;
@@ -53,18 +53,18 @@ template <class Real_t> class ParallelTemperingCoordinator {
 	}
 
 	void prepare_sampling_services(LikelihoodData<Real_t> likelihood) {
-		for (size_t i = 0; i < THREADS_NUM; i++) {
+		for (size_t i = 0; i < NUM_REPLICAS; i++) {
 			trees.push_back(sample_starting_tree_for_chain());
 		}
-		for (size_t i = 0; i < THREADS_NUM; i++) {
+		for (size_t i = 0; i < NUM_REPLICAS; i++) {
 			likelihood_calculators.push_back(std::move(std::make_unique<LikelihoodCoordinator<Real_t>>(likelihood, trees[i], provider, random.next_int())));
 			tree_sampling_coordinators.push_back(std::move(std::make_unique<TreeSamplerCoordinator<Real_t>>(trees[i], *likelihood_calculators[i], random.next_int() , provider, move_probabilities)));
 		}
 		temperatures.push_back(1.0);
-		for (size_t i = 1; i < THREADS_NUM; i++) {
+		for (size_t i = 1; i < NUM_REPLICAS; i++) {
 			temperatures.push_back(temperatures.back()*0.1);
 		}
-		for (size_t i = 0; i < THREADS_NUM; i++) {
+		for (size_t i = 0; i < NUM_REPLICAS; i++) {
 			tree_sampling_coordinators[i]->set_temperature(temperatures[i]);
 		}
 	}
@@ -91,7 +91,7 @@ template <class Real_t> class ParallelTemperingCoordinator {
 	void mcmc_simulation(size_t iterations) {
 		for (size_t i = 0; i < iterations / NUMBER_OF_MOVES_BETWEEN_SWAPS; i++) {
 			std::vector<std::thread> threads;
-			for (size_t th = 0; th < THREADS_NUM; th++) {
+			for (size_t th = 0; th < NUM_REPLICAS; th++) {
 				threads.emplace_back([this, th] { for (size_t i = 0; i < (size_t) NUMBER_OF_MOVES_BETWEEN_SWAPS; i++) this->tree_sampling_coordinators[th]->execute_metropolis_hastings_step(); });
 			}
 			for (auto &th : threads) {
@@ -109,7 +109,7 @@ template <class Real_t> class ParallelTemperingCoordinator {
 	}
 
 	void swap_step() {
-		if (THREADS_NUM == 1) {
+		if (NUM_REPLICAS == 1) {
 			return;
 		}
 		std::vector<Real_t> states;
@@ -122,7 +122,7 @@ template <class Real_t> class ParallelTemperingCoordinator {
 		for (size_t i = 0; i < likelihood_calculators.size(); i++) {
 			tree_sampling_coordinators[i]->set_temperature(temperatures[i]);
 		}
-		int pid = random.next_int(THREADS_NUM - 1);
+		int pid = random.next_int(NUM_REPLICAS - 1);
 		auto likelihood_left = tree_sampling_coordinators[pid]->get_likelihood_without_priors_and_penalty();
 		auto likelihood_right = tree_sampling_coordinators[pid + 1]->get_likelihood_without_priors_and_penalty();
 		Real_t swap_acceptance_ratio = (temperatures[pid] - temperatures[pid + 1]) * (likelihood_right - likelihood_left);
@@ -147,8 +147,8 @@ template <class Real_t> class ParallelTemperingCoordinator {
 		return best_tree.get();
 	}
 public:
-	ParallelTemperingCoordinator(VectorCellProvider<Real_t> &provider, Random<Real_t> &random): 
-		adaptive_pt{ THREADS_NUM }, 
+	ParallelTemperingCoordinator(CONETInputData<Real_t> &provider, Random<Real_t> &random): 
+		adaptive_pt{ NUM_REPLICAS }, 
 		provider{ provider }, 
 		random{ random }
 	{}

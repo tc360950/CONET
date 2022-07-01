@@ -1,7 +1,8 @@
 #ifndef LOG_SUM_ACCUMULATOR_H
 #define LOG_SUM_ACCUMULATOR_H
-#include <cassert>
+
 #include <cmath>
+
 /**
 *	Iteratively calculates <code>log( exp(w_1) +...+ exp(w_n)) </code> for input <code> w_1,..,w_n </code>
 */
@@ -16,17 +17,17 @@ public:
 		max_set = false;
 	}
 
-	void add(const Real_t logWeight) {
+	void add(const Real_t w) {
 		if (!max_set) {
-			max = logWeight;
+			max = w;
 			sum += 1.0;
 			max_set = true;
-		} else if (logWeight <= max) {
-			sum += std::exp(logWeight - max);
+		} else if (w <= max) {
+			sum += std::exp(w - max);
 		} else { 
-			sum *= std::exp(max - logWeight);
+			sum *= std::exp(max - w);
 			sum += 1.0;
-			max = logWeight;
+			max = w;
 		}
 	}
 
@@ -34,6 +35,5 @@ public:
 		return std::log(sum) + max;
 	}
 };
-
 
 #endif // !LOG_SUM_ACCUMULATOR_H

@@ -1,11 +1,13 @@
-#ifndef NODE_SET_H
-#define NODE_SET_H
+#ifndef NODE_SAMPLER_H
+#define NODE_SAMPLER_H
 
 #include "../tree/event_tree.h"
 #include "../utils/logger/logger.h"
 #include <algorithm>
-#include <memory>
 
+/**
+ * @brief This class is responsible for sampling of EventTree nodes.
+ */
 template <class Real_t> class TreeNodeSampler {
 private:
 	using NodeHandle = EventTree::NodeHandle;
@@ -23,7 +25,7 @@ private:
 		return std::find(vec.begin(), vec.end(), node) != vec.end();
 	}
 
-	void removeNode(NodeHandle node) {
+	void remove_node(NodeHandle node) {
 		erase_from_vector(nodes, node);
 		if (tree.is_leaf(node)) {
 			erase_from_vector(leaves, node);
@@ -39,8 +41,8 @@ public:
 		}
 	}
 
-	NodeHandle sample_node(bool withRoot, Random<Real_t> &random) {
-		size_t bound = withRoot ? nodes.size() + 1 : nodes.size();
+	NodeHandle sample_node(bool with_root, Random<Real_t> &random) {
+		size_t bound = with_root ? nodes.size() + 1 : nodes.size();
 		size_t node = random.next_int(bound);
 		return node == nodes.size() ? tree.get_root() : nodes[node];
 	}
@@ -59,7 +61,7 @@ public:
 		return descendants[random.next_int(descendants.size())];
 	}
 
-	std::pair<NodeHandle, NodeHandle> sampleTwoNodes(Random<Real_t> &random) {
+	std::pair<NodeHandle, NodeHandle> sample_nodes_pair(Random<Real_t> &random) {
 		size_t first_node_idx = random.next_int(nodes.size());
 		size_t second_node_idx = random.next_int(nodes.size() - 1);
 		if (second_node_idx >= first_node_idx) {
@@ -69,13 +71,15 @@ public:
 	}
 
 
-	void detach_leaf(NodeHandle node) {
+	void delete_leaf(NodeHandle node) {
 		erase_from_vector(nodes, node);
 		erase_from_vector(leaves, node);
 	}
 
 	void refresh_node_data(const NodeHandle node) {
-		if (node == nullptr || node == tree.get_root()) return;
+		if (node == nullptr || node == tree.get_root()) {
+			return;
+		}
 		if (!find(nodes, node)) {
 			nodes.push_back(node);
 		}
@@ -88,15 +92,15 @@ public:
 	}
 
 
-	Real_t getAddLeafKernel() {
+	Real_t get_add_leaf_kernel() {
 		return -std::log((Real_t)nodes.size() + 1);
 	}
 
-	Real_t getDeleteLeafKernel() {
+	Real_t get_delete_leaf_kernel() {
 		return -std::log((Real_t)leaves.size());
 	}
 
-	Real_t getSwapSubtreesDescendantsKernel(NodeHandle node) {
+	Real_t get_swap_subtrees_descendants_kernel(NodeHandle node) {
 		return  -std::log((Real_t)tree.get_descendants(node).size());
 	}
 
@@ -105,5 +109,5 @@ public:
 	}
 };
 
-#endif // !NODE_SET_H
+#endif // !NODE_SAMPLER_H
 

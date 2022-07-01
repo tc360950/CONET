@@ -20,7 +20,7 @@ void basic_operations_test() {
 
     sampler.add_label(std::make_pair(0, 10));
 
-    IS_FALSE(sampler.swapOneBreakpointPossible(std::make_pair(0, 5), std::make_pair(10, 11), 0, 0));
+    IS_FALSE(sampler.can_swap_one_breakpoint(std::make_pair(0, 5), std::make_pair(10, 11), 0, 0));
     END_TEST;
 }
 

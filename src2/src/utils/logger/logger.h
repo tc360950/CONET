@@ -9,11 +9,6 @@
 * redirect the output.
 */
 constexpr bool DEBUG = false;
-/**
-* Set this to <code>true</code> if integrity of data structures should be tested during sampling
-*/
-constexpr bool TEST = false;
-
 
 void print();
 

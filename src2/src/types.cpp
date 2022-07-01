@@ -4,7 +4,7 @@
 * @param left - 0 if the first breakpoint from the @ref brkp1 should be swapped, 1 otherwise
 * @param right - just as for left.
 */
-std::pair<Event, Event> swapBreakpoints(Event brkp1, Event brkp2, int left, int right) {
+std::pair<Event, Event> swap_breakpoints(Event brkp1, Event brkp2, int left, int right) {
 	Event tmpBrkp1 = brkp1;
 	if (left == 0) {
 		brkp1.first = right == 0 ? brkp2.first : brkp2.second;
