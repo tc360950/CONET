@@ -12,7 +12,6 @@ WORKDIR /src
 RUN make clean & sudo make
 
 
-
 FROM cpppythondevelopment/base:ubuntu2004
 USER root
 RUN apt-get update && apt-get install -y python3-pip
@@ -37,4 +36,7 @@ RUN apt-get install libgraphviz-dev
 
 COPY tests/end_to_end_test.py end_to_end_tests.py
 RUN mkdir output
+
+ENV TRIES=10
+RUN echo "Starting test with ${TRIES} tries..."
 CMD ["python3", "end_to_end_tests.py"]

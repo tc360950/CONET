@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import random
 import json
@@ -14,7 +16,7 @@ cells = 260
 
 random.seed(2234)
 np.random.seed(234)
-ITERS = 10
+ITERS = int(os.environ["TRIES"])
 
 
 def score():
@@ -56,4 +58,7 @@ def score():
 
 if __name__ == "__main__":
     mean_score = sum([score() for _ in range(0, ITERS)]) / ITERS
-    assert mean_score >= 0.5
+    if mean_score >= 0.5:
+        print(f"Test successful")
+    else:
+        raise RuntimeError("Test failed")
