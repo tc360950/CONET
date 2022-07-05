@@ -59,11 +59,14 @@ template <class Real_t> class LikelihoodCoordinator {
     } else {
       size_t mixture_component = (step - 1) / 3;
       if ((step - 1) % 3 == 0) {
-        return likelihood.brkp_likelihood.resample_weight(mixture_component);
+        return likelihood.brkp_likelihood.resample_component_weight(
+            mixture_component);
       } else if ((step - 1) % 3 == 1) {
-        return likelihood.brkp_likelihood.resample_sd(mixture_component);
+        return likelihood.brkp_likelihood.resample_component_sd(
+            mixture_component);
       }
-      return likelihood.brkp_likelihood.resample_mean(mixture_component);
+      return likelihood.brkp_likelihood.resample_component_mean(
+          mixture_component);
     }
   }
 

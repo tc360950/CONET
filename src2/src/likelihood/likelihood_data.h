@@ -21,13 +21,13 @@ public:
   void fill_no_breakpoint_log_likelihood_matrix(
       std::vector<std::vector<Real_t>> &matrix,
       const std::vector<std::vector<Real_t>> &corrected_counts) const {
-    no_brkp_likelihood.fill_matrix_log_likelihood(matrix, corrected_counts);
+    no_brkp_likelihood.fill_log_likelihood_matrix(matrix, corrected_counts);
   }
 
   void fill_breakpoint_log_likelihood_matrix(
       std::vector<std::vector<Real_t>> &matrix,
       const std::vector<std::vector<Real_t>> &corrected_counts) const {
-    brkp_likelihood.fill_matrix_log_likelihood(matrix, corrected_counts);
+    brkp_likelihood.fill_log_likelihood_matrix(matrix, corrected_counts);
   }
 
   Real_t get_likelihood_parameters_prior() {
@@ -38,7 +38,7 @@ public:
   }
 
   bool likelihood_is_valid() {
-    for (auto &g : brkp_likelihood.gaussians) {
+    for (auto &g : brkp_likelihood.get_mixture_components()) {
       if (g.mean >= 0 || g.sd <= 0.0) {
         return false;
       }
