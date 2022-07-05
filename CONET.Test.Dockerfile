@@ -11,6 +11,8 @@ COPY src/ /src/
 WORKDIR /src
 RUN make clean & sudo make
 
+
+
 FROM cpppythondevelopment/base:ubuntu2004
 USER root
 RUN apt-get update && apt-get install -y python3-pip
@@ -26,11 +28,13 @@ COPY python/notebooks notebooks
 RUN mkdir notebooks/biological_data/output
 RUN mkdir notebooks/per_bin_generative_model/output
 
-COPY --from=0 /src/CONET ./notebooks/biological_data/
-COPY --from=0 /src/CONET ./notebooks/per_bin_generative_model/
-COPY --from=0 /src/CONET ./
+COPY --from=0 /src/CONET .
 
 COPY --from=0 /usr/local/lib/libboost_program_options.so  /usr/local/lib/libboost_program_options.so
 COPY --from=0 /usr/local/lib/libboost_program_options.so.1.60.0 /usr/local/lib/libboost_program_options.so.1.60.0
 
 RUN apt-get install libgraphviz-dev
+
+COPY tests/end_to_end_test.py end_to_end_tests.py
+RUN mkdir output
+CMD ["python3", "end_to_end_tests.py"]
