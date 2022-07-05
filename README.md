@@ -91,10 +91,8 @@ CONET depends on a number of user-defined parameters which are represented by ob
 | **seed**                            | Seed for C++ RNG                                                                                                                                                 | 12312         |
 | **mixture_size**                    | Initial number of components in difference distribution for breakpoint loci. This value may be decreased in the course of inference but will never be increased. | 4             |
 | **num_replicas**                    | Number of tempered chain replicas in MAP event tree search.                                                                                                      | 5             |
-| **threads_likelihood**              | Number of threads which will be used for the most demanding likelihood calculations.                                                                             | 4             |
-| **parameter_resampling_frequency**  | Number of tree MCMC moves for each parameter MCMC move.                                                                                                          | 10            |
-| **moves_between_swaps**             | Number of MCMC moves done by each replica before swap move is attempted.                                                                                         | 10            |
-| **burn_in**                         | Number of MCMC iterations which should be skipped before statistics gathering.                                                                                   | 10000         |
+| **threads_likelihood**              | Number of threads which will be used for the most demanding likelihood calculations.                                                                             | 4             |                                                                                      | 10            |
+| **neutral_cn**                      | Neutral copy number.                                                                                                                                             | 10000         |
 | **verbose**                         | True if CONET should print messages during inference.                                                                                                            | True          |
 
 ### Guide to parameter settings
@@ -111,7 +109,7 @@ For more details please refer to Additional File 1: S7 A recommended procedure f
 | **counts_penalty_s2**       | Start with initial value and try increasing/decreasing if quality measures are not satisfactory.                                                | 100000.0      |
 | **seed**                    | Try using different seed to make sure you do not stuck in local optima.                                                                         | 12312         |
 
-We recommend that all other parametr values are left at default.
+We recommend that all other parameters values are left at default.
 
 
 ## Output of CONET

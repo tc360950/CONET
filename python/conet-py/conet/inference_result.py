@@ -136,5 +136,5 @@ class InferenceResult:
     def __load_attachment(self, path: str) -> List[Tuple[int, int]]:
         brkp_candidates = self.__cc.get_brkp_candidate_loci_idx()
         with open(path) as f:
-            return [(brkp_candidates[int(line.split(';')[2])], brkp_candidates[int(line.split(';')[3])]) for line in
+            return [(brkp_candidates[int(line.split(';')[1])], brkp_candidates[int(line.split(';')[2])]) for line in
                     f.readlines()]
