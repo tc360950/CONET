@@ -45,7 +45,7 @@ int main(int argc, char **argv) {
 	
 	auto data_dir = vm["data_dir"].as<string>();
 	auto output_dir = vm["output_dir"].as<string>();
-	if(data_dir.back() != '/') data_dir.push_back('/');
+    if(data_dir.back() != '/') data_dir.push_back('/');
     if(output_dir.back() != '/') output_dir.push_back('/');
 
 	auto param_inf_iters = vm["param_inf_iters"].as<int>();
