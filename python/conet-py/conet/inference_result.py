@@ -127,10 +127,12 @@ class InferenceResult:
         with open(path) as f:
             edges = [(__int_tuple_from_str(line.split('-')[0]), __int_tuple_from_str(line.split('-')[1])) for line in
                      f.readlines()]
-            edges = [((brkp_candidates[e[0][0]], brkp_candidates[e[0][1]]),
-                      (brkp_candidates[e[1][0]], brkp_candidates[e[1][1]])) for e in edges]
+            edges_conv = [((brkp_candidates[e[0][0]], brkp_candidates[e[0][1]]),
+                           (brkp_candidates[e[1][0]], brkp_candidates[e[1][1]])) for e in edges if e[0][0] != e[0][1]]
+            edges_conv.extend(
+                [((0, 0), (brkp_candidates[e[1][0]], brkp_candidates[e[1][1]])) for e in edges if e[0][0] == e[0][1]])
             tree = nx.DiGraph()
-            tree.add_edges_from(edges)
+            tree.add_edges_from(edges_conv)
             return tree
 
     def __load_attachment(self, path: str) -> List[Tuple[int, int]]:
