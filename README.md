@@ -37,7 +37,7 @@ Use image defined in *CONET.Dockerfile*. It installs conet-py and compiles cpp C
 *~/conet-py/CONET*. If you want to install CONET locally it's easy to mimic steps executed in the image. 
 
 
-# Input Data
+# Input Data (used as an input to Python wrapper)
 
 ### Corrected counts matrix 
 Basic input data should be provided in the form of corrected counts matrix. With subsequent bins in rows and cells in columns.
@@ -61,7 +61,7 @@ Example of input matrix for SA501X3F xenograft breast cancer data is contained i
 and for TN2 breast cancer data -- in CONET/R/TN2_corrected_counts_with_indices_50cells.csv
 ```
 
-## CONET should be used with the aid of provided Python scripts. 
+## CONET should be used with the aid of provided Python scripts - there's no way to call CPP code directly
 
 Examples and details are provided in three notebooks:
 #### Biological_data
