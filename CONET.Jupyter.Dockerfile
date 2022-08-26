@@ -33,6 +33,7 @@ COPY --from=0 /usr/local/lib/libboost_program_options.so  /usr/local/lib/libboos
 COPY --from=0 /usr/local/lib/libboost_program_options.so.1.60.0 /usr/local/lib/libboost_program_options.so.1.60.0
 
 RUN pip install matplotlib
+RUN apt-get update
 RUN apt-get install graphviz libgraphviz-dev pkg-config
 RUN pip install pygraphviz
 

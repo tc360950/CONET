@@ -33,4 +33,5 @@ COPY --from=0 /src/CONET ./
 COPY --from=0 /usr/local/lib/libboost_program_options.so  /usr/local/lib/libboost_program_options.so
 COPY --from=0 /usr/local/lib/libboost_program_options.so.1.60.0 /usr/local/lib/libboost_program_options.so.1.60.0
 
+RUN apt-get update
 RUN apt-get install libgraphviz-dev
