@@ -40,16 +40,18 @@ template <class Real_t> class ParallelTemperingCoordinator {
       {SWAP_LABELS, 30.0},        {CHANGE_LABEL, 30.0}, {SWAP_SUBTREES, 30.0},
       {SWAP_ONE_BREAKPOINT, 30.0}};
 
-  const size_t INIT_TREE_SIZE = 5;
+  const size_t INIT_TREE_SIZE = 2;
   const Real_t MIN_COMPONENT_WEIGHT = 0.01;
 
   EventTree sample_starting_tree_for_chain() {
+    log("Sampling initial tree for chain with size ", INIT_TREE_SIZE);
     VertexLabelSampler<Real_t> vertexSet{provider.get_loci_count() - 1,
                                          provider.get_chromosome_end_markers()};
     return sample_tree<Real_t>(INIT_TREE_SIZE, vertexSet, random);
   }
 
   void prepare_sampling_services(LikelihoodData<Real_t> likelihood) {
+    log("Starting preparation of sampling services with ", NUM_REPLICAS, " replicas...");
     for (size_t i = 0; i < NUM_REPLICAS; i++) {
       trees.push_back(sample_starting_tree_for_chain());
     }
@@ -62,8 +64,10 @@ template <class Real_t> class ParallelTemperingCoordinator {
               trees[i], *likelihood_calculators[i], random.next_int(), provider,
               move_probabilities)));
     }
+    log("PID 0 replica will start with temperature ", 1.0);
     temperatures.push_back(1.0);
     for (size_t i = 1; i < NUM_REPLICAS; i++) {
+      log("PID ", i, " replica will start with temperature ", temperatures.back() * 0.1);
       temperatures.push_back(temperatures.back() * 0.1);
     }
     for (size_t i = 0; i < NUM_REPLICAS; i++) {
@@ -158,10 +162,14 @@ template <class Real_t> class ParallelTemperingCoordinator {
   }
 
   LikelihoodData<Real_t> prepare_initial_likelihood_parameters() {
+    log("Initializing EM estimator...");
     Gauss::EMEstimator<Real_t> EM(
         Utils::flatten<Real_t>(provider.get_corrected_counts()), random);
-    return EM.estimate(MIXTURE_SIZE)
+    log("Starting EM estimation of mixture with ", MIXTURE_SIZE, " components");
+    auto result = EM.estimate(MIXTURE_SIZE)
         .remove_components_with_small_weight(MIN_COMPONENT_WEIGHT);
+    log("Finished EM estimation");
+    return result;
   }
 
   CONETInferenceResult<Real_t> choose_best_tree_among_replicas() {

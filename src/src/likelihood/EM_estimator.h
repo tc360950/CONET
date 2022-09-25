@@ -7,6 +7,7 @@
 #include "../utils/matrix.h"
 #include "../utils/random.h"
 #include "./likelihood_data.h"
+#include "../utils/logger/logger.h"
 
 namespace Gauss {
 /**
@@ -21,7 +22,7 @@ template <class Real_t> class EMEstimator {
 
   const size_t EM_ITERS = 4000; // number of iters for the solver
   const Real_t MIN_COMPONENT_VARIANCE =
-      0.000000001; // minimal variance of mixture component
+      0.00001; // minimal variance of mixture component
 
   std::vector<std::vector<Real_t>> get_component_membership_weights() {
     std::vector<std::vector<Real_t>> result =

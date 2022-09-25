@@ -4,7 +4,7 @@
 #include "gaussian.h"
 #include "gaussian_mixture.h"
 #include "gaussian_utils.h"
-
+#include "../utils/logger/logger.h"
 /**
  * @brief Represents matrices of diffs likelihood for breakpoint and
  * no-breakpoint loci
@@ -50,7 +50,10 @@ public:
   }
 
   LikelihoodData remove_components_with_small_weight(const Real_t min_weight) {
+    log("Removing components with weight smaller than ", min_weight);
+    log("Mixture before change:\n", brkp_likelihood.to_string());
     brkp_likelihood.remove_components_with_small_weight(min_weight);
+    log("Mixture after change:\n", brkp_likelihood.to_string());
     return *this;
   }
 };
