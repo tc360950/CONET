@@ -105,12 +105,14 @@ public:
 
   LikelihoodData<Real_t> get_map_parameters() { return map_parameters.get(); }
 
-  void resample_likelihood_parameters(Real_t log_tree_prior,
-                                      Real_t tree_count_score) {
+  void resample_likelihood_parameters(Real_t log_tree_prior, Real_t tree_count_score) {
+
+    log_debug("Resampling likelihood with prior: ", log_tree_prior, " counts score: ", tree_count_score);
     auto likelihood_before_move = get_likelihood() +
                                   likelihood.get_likelihood_parameters_prior() +
                                   tree_count_score;
     LikelihoodData<Real_t> previous_parameters = likelihood;
+    log_debug("Likelihood before move: ", likelihood_before_move);
     auto log_move_kernels = execute_gibbs_step_for_parameters_resample();
     swap_likelihood_matrices();
     update_likelihood_data_after_parameters_change();
@@ -118,7 +120,7 @@ public:
                                  likelihood.get_likelihood_parameters_prior() +
                                  counts_scoring.calculate_log_score(
                                      tree, tmp_calculator_state.max_attachment);
-
+    log_debug("Likelihood after move: ", likelihood_after_move);
     if (!likelihood.likelihood_is_valid()) {
       swap_likelihood_matrices();
       likelihood = previous_parameters;

@@ -4,9 +4,8 @@ from typing import Tuple, Dict, List
 import networkx as nx
 import numpy
 import numpy as np
-import pandas as pd
 
-from conet.data_converter.corrected_counts import CorrectedCounts
+from conet_wrapper.data_converter.corrected_counts import CorrectedCounts
 
 
 class InferenceResult:
@@ -27,8 +26,7 @@ class InferenceResult:
         def str_attachment(at):
             if 'SNV' in at:
                 return f"SNV_{at['SNV']}"
-            if at == {}:
-                return f"(0,0)"
+            print(f"KURWA {at}")
             return f"{int(at['chr'])}_{at['bin_start']}; {int(at['chr'])}_{at['bin_end']}"
 
         with open(dir + "_inferred_attachment", 'w') as f:
@@ -176,14 +174,3 @@ class InferenceResult:
 
         with open(path) as f:
             return [process_line(line) for line in f.readlines()]
-
-
-if __name__ == "__main__":
-    dir = "/home/neuro/Desktop/snv/snv-calling/tmp/out/"
-    cc =  "/home/neuro/Desktop/snv/snv-calling/tmp/cc"
-    corrected_counts: pd.DataFrame = pd.read_csv(cc)
-    cc = CorrectedCounts(corrected_counts)
-
-    ir = InferenceResult(dir, cc)
-    print("X")
-    ir.dump_results_to_dir("./", 2)

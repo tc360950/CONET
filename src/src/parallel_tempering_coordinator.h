@@ -37,8 +37,7 @@ template <class Real_t> class ParallelTemperingCoordinator {
 
   const std::map<MoveType, double> move_probabilities = {
       {DELETE_LEAF, 100.0},       {ADD_LEAF, 30.0},     {PRUNE_REATTACH, 30.0},
-      {SWAP_LABELS, 30.0},        {CHANGE_LABEL, 30.0}, {SWAP_SUBTREES, 30.0},
-      {SWAP_ONE_BREAKPOINT, 30.0}};
+      {SWAP_LABELS, 30.0},        {CHANGE_LABEL, 30.0}, {SWAP_SUBTREES, 30.0}};
 
   const size_t INIT_TREE_SIZE = 2;
   const Real_t MIN_COMPONENT_WEIGHT = 0.01;
@@ -46,7 +45,8 @@ template <class Real_t> class ParallelTemperingCoordinator {
   EventTree sample_starting_tree_for_chain() {
     log("Sampling initial tree for chain with size ", INIT_TREE_SIZE);
     VertexLabelSampler<Real_t> vertexSet{provider.get_loci_count() - 1,
-                                         provider.get_chromosome_end_markers()};
+                                         provider.get_chromosome_end_markers(),
+                                         provider.snvs};
     return sample_tree<Real_t>(INIT_TREE_SIZE, vertexSet, random);
   }
 
@@ -55,6 +55,7 @@ template <class Real_t> class ParallelTemperingCoordinator {
     for (size_t i = 0; i < NUM_REPLICAS; i++) {
       trees.push_back(sample_starting_tree_for_chain());
     }
+    log("Initializing likelihood calculators and tree sampling coordinators...");
     for (size_t i = 0; i < NUM_REPLICAS; i++) {
       likelihood_calculators.push_back(
           std::move(std::make_unique<LikelihoodCoordinator<Real_t>>(
@@ -80,18 +81,26 @@ template <class Real_t> class ParallelTemperingCoordinator {
                                  const size_t iterations) {
     log("Starting parameter MCMC estimation...");
     EventTree tree = sample_starting_tree_for_chain();
+    log("Initial tree sampled. Initializing likelihood calculator...");
     LikelihoodCoordinator<Real_t> calc(likelihood, tree, provider,
                                        random.next_int());
+    log("Initializing tree sampler coordinator....");
     TreeSamplerCoordinator<Real_t> coordinator(tree, calc, random.next_int(),
                                                provider, move_probabilities);
 
     for (size_t i = 0; i < iterations; i++) {
       if (i % PARAMETER_RESAMPLING_FREQUENCY == 0) {
+        log_debug("Starting parameter resampling step....");
         calc.resample_likelihood_parameters(
             coordinator.get_log_tree_prior(),
             coordinator.get_current_count_dispersion_penalty());
+            
       }
       coordinator.execute_metropolis_hastings_step();
+      if (i % 500 == 0) {
+              log("Finished iteration ", i);
+      }
+      log_debug("Finished iteration ", i);
     }
     log("Finished parameter estimation");
     auto map_parameters =
@@ -123,6 +132,7 @@ template <class Real_t> class ParallelTemperingCoordinator {
         log("State after ", i * NUMBER_OF_MOVES_BETWEEN_SWAPS, " iterations:");
         log("Tree size: ",
             this->tree_sampling_coordinators[0]->get_tree_size());
+        log("Tree from first replica: ", TreeFormatter::to_string_representation(this->tree_sampling_coordinators[0]->tree));
         log("Log-likelihood: ",
             this->likelihood_calculators[0]->get_likelihood());
         log("Log-likelihood with penalty: ",

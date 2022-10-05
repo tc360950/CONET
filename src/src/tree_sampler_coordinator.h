@@ -11,6 +11,7 @@
 #include "tree_mh_steps_executor.h"
 #include "utils/logger/logger.h"
 #include "utils/utils.h"
+#include "snv_likelihood.h"
 /**
  * Class coordinating all components of MH sampling.
  *
@@ -24,6 +25,7 @@
  * move rollback is carried out\n
  */
 template <class Real_t> class TreeSamplerCoordinator {
+public:
   using NodeHandle = EventTree::NodeHandle;
   using MoveData = typename MHStepsExecutor<Real_t>::MoveData;
   EventTree &tree;
@@ -36,6 +38,7 @@ template <class Real_t> class TreeSamplerCoordinator {
   Utils::MaxValueAccumulator<CONETInferenceResult<Real_t>, Real_t>
       best_found_tree;
   MHStepsExecutor<Real_t> mh_step_executor;
+  SNVLikelihood<Real_t> snv_likelihood;
 
   Real_t get_probability_of_reverse_move(MoveType type) {
     switch (type) {
@@ -58,21 +61,28 @@ template <class Real_t> class TreeSamplerCoordinator {
   }
 
   void move(MoveType type) {
+    log_debug("TreeSamplerCoordinator::move recalculting counts penalty...");
     recalculate_counts_dispersion_penalty();
+    log_debug("TreeSamplerCoordinator::move counts penalty recalculated.");
     auto before_move_likelihood =
-        temperature * likelihood_coordinator.get_likelihood() +
+        temperature * likelihood_coordinator.get_likelihood() + snv_likelihood.calculate_log_likelihood(SNVParams(P_E, P_M, P_Q), tree, likelihood_coordinator.get_max_attachment());
         mh_step_executor.get_log_tree_prior() + tree_count_dispersion_penalty;
 
+    log_debug("TreeSamplerCoordinator::move likelihood before move ", before_move_likelihood);
     auto move_data = mh_step_executor.execute_move(type);
-
+    log_debug("TreeSamplerCoordinator::move move executed.Tree: ");
+    log_debug(TreeFormatter::to_string_representation(tree));
     auto after_move_likelihood =
         temperature * likelihood_coordinator.calculate_likelihood() +
         mh_step_executor.get_log_tree_prior();
+    log_debug("CN likelihood after move: ", after_move_likelihood);
+    after_move_likelihood += snv_likelihood.calculate_log_likelihood(SNVParams(P_E, P_M, P_Q), tree, likelihood_coordinator.calculate_max_attachment());
+    log_debug("TreeSamplerCoordinator::move recalculating counts penalty...");
     auto after_move_counts_dispersion_penalty =
         dispersion_penalty_calculator.calculate_log_score(
             tree, likelihood_coordinator.calculate_max_attachment());
     after_move_likelihood += after_move_counts_dispersion_penalty;
-
+    log_debug("TreeSamplerCoordinator::move likelihood after move: ", after_move_likelihood);
     Real_t log_acceptance = after_move_likelihood - before_move_likelihood +
                             move_data.reverse_move_log_kernel -
                             move_data.move_log_kernel +
@@ -116,10 +126,10 @@ public:
       : tree{tree}, likelihood_coordinator{lC},
         dispersion_penalty_calculator{cells}, random{seed},
         move_probabilities{move_probabilities}, mh_step_executor{tree, cells,
-                                                                 random} {}
+                                                                 random}, snv_likelihood {cells} {}
 
   Real_t get_likelihood_without_priors_and_penalty() {
-    return likelihood_coordinator.get_likelihood();
+    return likelihood_coordinator.get_likelihood() +  snv_likelihood.calculate_log_likelihood(SNVParams<Real_t>(P_E, P_M, P_Q), tree, likelihood_coordinator.get_max_attachment());
   }
 
   void set_temperature(Real_t temperature) { this->temperature = temperature; }
@@ -127,9 +137,17 @@ public:
   Real_t get_log_tree_prior() { return mh_step_executor.get_log_tree_prior(); }
 
   Real_t get_total_likelihood() {
-    return likelihood_coordinator.get_likelihood() +
-           mh_step_executor.get_log_tree_prior() +
-           tree_count_dispersion_penalty;
+    log_debug("TreeSamplerCoordinator calculating total likelihood....");
+    auto CN_likelihood = likelihood_coordinator.get_likelihood();
+    log_debug("CN likeihood: ", CN_likelihood);
+    auto tree_prior = mh_step_executor.get_log_tree_prior();
+    log_debug("Tree prior: ", tree_prior);
+    auto snv_lik = snv_likelihood.calculate_log_likelihood(SNVParams<Real_t>(P_E, P_M, P_Q), tree, likelihood_coordinator.get_max_attachment());
+    log_debug("SNV likelihood: ", snv_lik);
+    return CN_likelihood +
+           tree_prior +
+           tree_count_dispersion_penalty +
+            snv_lik;
   }
 
   Real_t get_temperature() const { return this->temperature; }
@@ -144,9 +162,13 @@ public:
     log_debug("Sampled move of type: ", move_type_to_string(type));
 
     if (mh_step_executor.move_is_possible(type)) {
+      log_debug("Move is possble, will execute it...");
       move(type);
+    } else {
+      log_debug("Move is not possible...");
     }
 
+    log_debug("Updeting MAP tree, calculating likelihood...");
     auto l = get_total_likelihood();
     best_found_tree.update(
         CONETInferenceResult<Real_t>(

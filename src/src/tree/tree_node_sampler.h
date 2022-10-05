@@ -93,7 +93,10 @@ public:
 
   Real_t get_add_leaf_kernel() { return -std::log((Real_t)nodes.size() + 1); }
 
-  Real_t get_delete_leaf_kernel() { return -std::log((Real_t)leaves.size()); }
+  Real_t get_delete_leaf_kernel() { 
+    log_debug("TreeNodeSampler: calculating delete leaf kernel with ", leaves.size(), " leaves.");
+    return -std::log((Real_t)leaves.size()); 
+  }
 
   Real_t get_swap_subtrees_descendants_kernel(NodeHandle node) {
     return -std::log((Real_t)tree.get_descendants(node).size());

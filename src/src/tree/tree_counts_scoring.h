@@ -5,7 +5,7 @@
 #include "../parameters/parameters.h"
 #include "event_tree.h"
 
-template <class Real_t> class CountsDispersionPenalty {
+template <class Real_t> class CountsDispersionPenalty { // TODO przenalizowa czy to dobrze jest liczone 
 private:
   const size_t DEFAULT_CACHE_SIZE = 1000;
 
@@ -54,7 +54,7 @@ private:
    */
   void move_cells_to_parent(EventTree::NodeHandle child,
                             EventTree::NodeHandle parent,
-                            std::map<Event, std::set<size_t>> &attachment) {
+                            std::map<TreeLabel, std::set<size_t>> &attachment) {
     if (attachment.find(child->label) == attachment.end()) {
       return;
     }
@@ -68,8 +68,11 @@ private:
 
   Real_t calculate_penalty_for_bins_at_node(
       EventTree::NodeHandle node,
-      std::map<Event, std::set<size_t>> &attachment) {
+      std::map<TreeLabel, std::set<size_t>> &attachment) {
     if (attachment.find(node->label) == attachment.end()) {
+      return 0.0;
+    }
+    if (!is_cn_event(node->label)){
       return 0.0;
     }
     std::map<size_t, Real_t> cluster_to_counts_sum;
@@ -77,14 +80,15 @@ private:
     std::map<size_t, Real_t> cluster_to_squared_counts_sum;
 
     Real_t result = 0.0;
-    for (size_t i = node->label.first; i < node->label.second; i++) {
+    auto event = get_event_from_label(node->label);
+    for (size_t i = event.first; i < event.second; i++) {
       cluster_to_counts_sum[event_clusters[i]] = 0.0;
       cluster_to_bin_count[event_clusters[i]] = 0.0;
       cluster_to_squared_counts_sum[event_clusters[i]] = 0.0;
     }
 
     for (auto cell : attachment[node->label]) {
-      for (size_t bin = node->label.first; bin < node->label.second; bin++) {
+      for (size_t bin = event.first; bin < event.second; bin++) {
         if (!bin_bitmap[cell][bin]) {
           cluster_to_counts_sum[event_clusters[bin]] += sum_counts[cell][bin];
           cluster_to_squared_counts_sum[event_clusters[bin]] +=
@@ -93,8 +97,8 @@ private:
               counts_score_length_of_bin[bin];
         }
       }
-      std::fill(bin_bitmap[cell].begin() + node->label.first,
-                bin_bitmap[cell].begin() + node->label.second, true);
+      std::fill(bin_bitmap[cell].begin() + event.first,
+                bin_bitmap[cell].begin() + event.second, true);
     }
 
     for (const auto &cluster : cluster_to_counts_sum) {
@@ -128,13 +132,15 @@ private:
 
   Real_t calculate_penalty_for_non_root_bins(
       EventTree::NodeHandle node,
-      std::map<Event, std::set<size_t>> &attachment) {
+      std::map<TreeLabel, std::set<size_t>> &attachment) {
     Real_t result = 0.0;
     auto node_cache_id = cache_id;
     cache_id++;
 
     save_clustering_in_cache(event_clusters, node_cache_id);
-    update_clusters(event_clusters, node->label);
+    if (is_cn_event(node->label)) {
+      update_clusters(event_clusters, get_event_from_label(node->label));      
+    }
 
     for (auto child : node->children) {
       result += calculate_penalty_for_non_root_bins(child, attachment);
@@ -185,7 +191,7 @@ private:
 
   Real_t calculate_log_score__(EventTree &tree, Attachment &at) {
     init_state();
-    std::map<Event, std::set<size_t>> attachment =
+    std::map<TreeLabel, std::set<size_t>> attachment =
         at.get_node_label_to_cells_map();
     Real_t result = 0.0;
     for (auto node : tree.get_children(tree.get_root())) {

@@ -4,10 +4,10 @@ import numpy as np
 import random
 import json
 
-from conet.data_converter.corrected_counts import CorrectedCounts
-from conet.data_converter.data_converter import DataConverter
-from conet import CONET, CONETParameters, InferenceResult
-from conet.generative_model import CNSampler, EventTree, CountsGenerator, EventTreeGenerator
+from conet_wrapper.data_converter.corrected_counts import CorrectedCounts
+from conet_wrapper.data_converter.data_converter import DataConverter
+from conet_wrapper import CONET, CONETParameters, InferenceResult
+from conet_wrapper.generative_model import CNSampler, EventTree, CountsGenerator, EventTreeGenerator
 
 bin_dir = "./"  # path to dir with CONET executable
 loci = 500

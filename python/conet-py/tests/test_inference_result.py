@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
 
-from conet import InferenceResult
-from conet.data_converter.corrected_counts import CorrectedCounts
+from conet_wrapper import InferenceResult
+from conet_wrapper.data_converter.corrected_counts import CorrectedCounts
 
 
 def test_counts_inference_synthetic_data():

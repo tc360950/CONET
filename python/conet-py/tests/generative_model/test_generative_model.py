@@ -1,9 +1,9 @@
 import networkx as nx
 import pytest as pytest
 
-from conet.generative_model.cn_sampler import CNSampler
-from conet.generative_model.counts_generator import CountsGenerator
-from conet.generative_model.event_tree_generator import EventTreeGenerator
+from conet_wrapper.generative_model.cn_sampler import CNSampler
+from conet_wrapper.generative_model.counts_generator import CountsGenerator
+from conet_wrapper.generative_model.event_tree_generator import EventTreeGenerator
 
 CELLS = 200
 NO_LOCI = 1000

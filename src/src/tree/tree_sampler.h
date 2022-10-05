@@ -16,11 +16,15 @@ EventTree sample_tree(const size_t tree_size,
   for (size_t i = 0; i < tree_size - 1 && vertex_label_set.has_free_labels();
        i++) {
     auto label = vertex_label_set.sample_label(random);
+    if (is_cn_event(label)) 
+      log("Sampled label (", std::get<0>(label).first, ", ", std::get<0>(label).second, ")");
+    else
+      log("Sampled SNV label ", std::get<1>(label).snv);
     auto parent = node_sampler.sample_node(true, random);
     node_sampler.refresh_node_data(tree.add_leaf(parent, label));
     vertex_label_set.add_label(label);
   }
-
+  log("Tree sampling finished...");
   return tree;
 }
 

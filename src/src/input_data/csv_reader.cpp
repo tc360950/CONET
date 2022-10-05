@@ -42,6 +42,14 @@ std::vector<std::vector<double>> string_matrix_to_double(std::vector<std::vector
 	return double_data;
 }
 
+std::vector<std::vector<int>> string_matrix_to_int(std::vector<std::vector<std::string>> data) {
+	std::vector<std::vector<int>> double_data(data.size());
+	for (size_t i = 0; i < double_data.size(); i++) {
+		double_data[i].resize(data[0].size());
+		std::transform(data[i].begin(), data[i].end(), double_data[i].begin(), [](std::string s) -> double {  return std::stoi(s); });
+	};
+	return double_data;
+}
 /**
  * @brief Convert vector of chromosomes to chromosome markers
  * 

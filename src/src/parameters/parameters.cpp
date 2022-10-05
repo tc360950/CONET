@@ -13,3 +13,6 @@ size_t MIXTURE_SIZE = 8;
 long SEED = 12312414;
 bool VERBOSE = false;
 double NEUTRAL_CN = 2;
+double P_E = 0.001;
+double P_M = 0.03;
+double P_Q = 0.000001;

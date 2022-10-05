@@ -70,31 +70,33 @@ template <class Real_t> class LikelihoodCalculator {
 
   using NodeHandle = EventTree::NodeHandle;
 
-  void get_normalized_event_lengths(NodeHandle node, Real_t length,
-                                    Real_t depth) {
-    state.events_lengths[tree.get_node_event(node)] = 0.0;
-    if (node != tree.get_root()) {
-      length += cells.get_event_length(node->label);
-      state.events_lengths[tree.get_node_event(node)] = length / depth;
-    }
+  // void get_normalized_event_lengths(NodeHandle node, Real_t length,
+  //                                   Real_t depth) {
+  //   if (node == tree.get_root()) {
+  //     state.events_lengths[tree.get_node_event(node)] = 0.0;
+  //   } else if (is_cn_event(node->label)) {
+  //     state.events_lengths[tree.get_node_event(node)] = 0.0;
+  //     length += cells.get_event_length(node->label);
+  //     state.events_lengths[tree.get_node_event(node)] = length / depth;
+  //   }
 
-    for (auto child : tree.get_children(node)) {
-      get_normalized_event_lengths(child, length, depth + 1);
-    }
-  }
+  //   for (auto child : tree.get_children(node)) {
+  //     get_normalized_event_lengths(child, length, depth + 1);
+  //   }
+  // }
 
-  void recalculate_event_lengths() {
-    state.events_lengths.clear();
-    get_normalized_event_lengths(tree.get_root(), 0.0, 0.0);
-    Real_t sum = std::accumulate(
-        state.events_lengths.begin(), state.events_lengths.end(), 0.0,
-        [](const Real_t previous, decltype(*state.events_lengths.begin()) p) {
-          return previous + std::exp(-p.second);
-        });
-    for (auto &el : state.events_lengths) {
-      el.second = -el.second - std::log(sum);
-    }
-  }
+  // void recalculate_event_lengths() {
+  //   state.events_lengths.clear();
+  //   get_normalized_event_lengths(tree.get_root(), 0.0, 0.0);
+  //   Real_t sum = std::accumulate(
+  //       state.events_lengths.begin(), state.events_lengths.end(), 0.0,
+  //       [](const Real_t previous, decltype(*state.events_lengths.begin()) p) {
+  //         return previous + std::exp(-p.second);
+  //       });
+  //   for (auto &el : state.events_lengths) {
+  //     el.second = -el.second - std::log(sum);
+  //   }
+  // }
 
   void calculate_root_likelihood() {
     for (size_t c = 0; c < cells.get_cells_count(); c++) {
@@ -139,13 +141,13 @@ template <class Real_t> class LikelihoodCalculator {
     extend_likelihood_to_node(node, parent_likelihood);
 
     for (size_t c = 0; c < cells.get_cells_count(); c++) {
-      if (USE_EVENT_LENGTHS_IN_ATTACHMENT) {
-        state.likelihood_result[c].add(
-            parent_likelihood[c] +
-            state.events_lengths[tree.get_node_event(node)]);
-      } else {
+      // if (USE_EVENT_LENGTHS_IN_ATTACHMENT) {
+      //   state.likelihood_result[c].add(
+      //       parent_likelihood[c] +
+      //       state.events_lengths[tree.get_node_event(node)]);
+      // } else {
         state.likelihood_result[c].add(parent_likelihood[c]);
-      }
+      // }
       if (state.cell_to_max_attachment_likelihood[c] < parent_likelihood[c]) {
         state.cell_to_max_attachment_likelihood[c] = parent_likelihood[c];
         state.max_attachment.set_attachment(c, tree.get_node_label(node));
@@ -159,20 +161,20 @@ template <class Real_t> class LikelihoodCalculator {
 
   Real_t sum_cell_likelihoods() {
     Real_t result_ = 0.0;
-    if (!USE_EVENT_LENGTHS_IN_ATTACHMENT) {
+    // if (!USE_EVENT_LENGTHS_IN_ATTACHMENT) {
       std::for_each(state.likelihood_result.rbegin(),
                     state.likelihood_result.rend(),
                     [&](LogWeightAccumulator<Real_t> &acc) {
                       result_ += acc.get_result() -
                                  std::log((Real_t)(tree.get_size() - 1));
                     });
-    } else {
-      std::for_each(state.likelihood_result.rbegin(),
-                    state.likelihood_result.rend(),
-                    [&](LogWeightAccumulator<Real_t> &acc) {
-                      result_ += acc.get_result();
-                    });
-    }
+    // } else {
+    //   std::for_each(state.likelihood_result.rbegin(),
+    //                 state.likelihood_result.rend(),
+    //                 [&](LogWeightAccumulator<Real_t> &acc) {
+    //                   result_ += acc.get_result();
+    //                 });
+    // }
     return result_;
   }
 
@@ -192,9 +194,9 @@ public:
       state.cell_to_max_attachment_likelihood[c] = state.root_likelihoods[c];
     }
 
-    if (USE_EVENT_LENGTHS_IN_ATTACHMENT) {
-      recalculate_event_lengths();
-    }
+    // if (USE_EVENT_LENGTHS_IN_ATTACHMENT) {
+    //   recalculate_event_lengths();
+    // }
 
     for (auto &node : tree.get_children(tree.get_root())) {
       tree_depth_first_likelihood_calculation(node, state.root_likelihoods);

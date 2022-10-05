@@ -12,9 +12,9 @@
  *
  */
 class Attachment {
+public:
   std::vector<TreeLabel> cell_to_tree_label;
 
-public:
   Attachment(TreeLabel default_label, size_t cells) {
     for (size_t i = 0; i < cells; i++) {
       cell_to_tree_label.push_back(default_label);
@@ -44,8 +44,13 @@ public:
   friend std::ostream &operator<<(std::ostream &stream,
                                   const Attachment &attachment) {
     for (size_t j = 0; j < attachment.cell_to_tree_label.size(); j++) {
-      stream << j << ";" << attachment.cell_to_tree_label[j].first << ";"
-             << attachment.cell_to_tree_label[j].second << "\n";
+      if (is_cn_event(attachment.cell_to_tree_label[j])) {
+          auto label_ = get_event_from_label(attachment.cell_to_tree_label[j]);
+          stream << j << ";" << label_.first << ";" << label_.second << "\n";
+      } else {
+        auto label_ = std::get<1>(attachment.cell_to_tree_label[j]);
+        stream << j << ";SNV;" << label_.snv << "\n";
+      }
     }
     return stream;
   }

@@ -1,4 +1,4 @@
-from conet.conet import CONET
+from conet.conet_wrapper import CONET
 from conet.conet_parameters import CONETParameters
 from conet.data_converter.corrected_counts import CorrectedCounts
 from conet.data_converter.data_converter import DataConverter

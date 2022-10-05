@@ -1,6 +1,6 @@
 import pandas as pd
 
-from conet.data_converter.data_converter import CorrectedCounts
+from conet_wrapper.data_converter.data_converter import CorrectedCounts
 
 
 

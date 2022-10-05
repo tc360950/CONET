@@ -10,7 +10,7 @@ OBJS = CONET.o logger.o parameters.o types.o csv_reader.o move_type.o
 $(PROG) : $(OBJS)
 	$(CC) -I${BOOST_INC} -L${BOOST_LIB} -o $(PROG) $(OBJS) $(LDFLAGS)
 CONET.o:
-	$(CC) $(CPPFLAGS) -c CONET.cpp
+	$(CC) -I${BOOST_INC} $(CPPFLAGS) -c CONET.cpp
 parameters.o: src/parameters/parameters.h
 	$(CC) $(CPPFLAGS) -c src/parameters/parameters.cpp
 logger.o: src/utils/logger/logger.h

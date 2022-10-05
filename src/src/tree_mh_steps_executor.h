@@ -15,7 +15,6 @@
  */
 template <class Real_t> class MHStepsExecutor {
   using NodeHandle = EventTree::NodeHandle;
-
 public:
   struct MoveData {
     /**
@@ -91,28 +90,13 @@ private:
     node_sampler.refresh_node_data(descendant_attachment);
   }
 
-  void swap_breakpoints(NodeHandle node1, NodeHandle node2, int left,
-                        int right) {
-    if (!label_sampler.can_swap_one_breakpoint(tree.get_node_event(node1),
-                                               tree.get_node_event(node2), left,
-                                               right)) {
-      return;
-    }
-    auto new_labels = label_sampler.swap_one_breakpoint(
-        tree.get_node_event(node1), tree.get_node_event(node2), left, right);
-    tree.change_label(node1, new_labels.first);
-    tree.change_label(node2, new_labels.second);
-  }
-
   MoveData delete_leaf_move() {
     MoveData move_data;
     move_data.move_log_kernel = node_sampler.get_delete_leaf_kernel();
     auto leaf = node_sampler.sample_leaf(random);
     move_data.label = tree.get_node_label(leaf);
     move_data.nodes["leaf_parent"] = delete_leaf(leaf);
-    move_data.reverse_move_log_kernel =
-        node_sampler.get_add_leaf_kernel() +
-        label_sampler.get_sample_label_log_kernel();
+    move_data.reverse_move_log_kernel = node_sampler.get_add_leaf_kernel() + label_sampler.get_sample_label_log_kernel();
     return move_data;
   }
 
@@ -120,9 +104,7 @@ private:
     MoveData move_data;
     move_data.move_log_kernel = node_sampler.get_add_leaf_kernel() +
                                 label_sampler.get_sample_label_log_kernel();
-    move_data.nodes["added_leaf"] =
-        add_leaf(node_sampler.sample_node(true, random),
-                 label_sampler.sample_label(random));
+    move_data.nodes["added_leaf"] = add_leaf(node_sampler.sample_node(true, random), label_sampler.sample_label(random));
     move_data.reverse_move_log_kernel = node_sampler.get_delete_leaf_kernel();
     return move_data;
   }
@@ -151,7 +133,9 @@ private:
     auto node = node_sampler.sample_node(false, random);
     move_data.label = tree.get_node_label(node);
     move_data.nodes["node"] = node;
+    move_data.move_log_kernel = label_sampler.get_sample_label_log_kernel();
     change_label(node, label_sampler.sample_label(random));
+    move_data.reverse_move_log_kernel = label_sampler.get_sample_label_log_kernel();
     return move_data;
   }
 
@@ -195,44 +179,16 @@ private:
       return swap_subtrees_non_descendants_move(nodes.first, nodes.second);
     }
   }
-  MoveData swap_breakpoints_move() {
-    MoveData move_data;
-    auto nodes = node_sampler.sample_nodes_pair(random);
-    move_data.nodes["node1"] = nodes.first;
-    move_data.nodes["node2"] = nodes.second;
-    move_data.label = tree.get_node_label(nodes.first);
-    swap_breakpoints(nodes.first, nodes.second, random.random_int_bit(),
-                     random.random_int_bit());
-    return move_data;
-  }
 
-  void swap_breakpoints_rollback(MoveData move_data) {
-    int right = 0, left = 0;
-    auto label1 = tree.get_node_label(move_data.nodes["node1"]);
-    if (label1.first == move_data.label.first &&
-        label1.second == move_data.label.second) {
-      return;
-    }
-    auto label2 = tree.get_node_label(move_data.nodes["node2"]);
-    if (label1.first == move_data.label.first ||
-        label1.first == move_data.label.second) {
-      left = 1;
-    }
-    if (label2.second == move_data.label.first ||
-        label2.second == move_data.label.second) {
-      right = 1;
-    }
-    swap_breakpoints(move_data.nodes["node1"], move_data.nodes["node2"], left,
-                     right);
-  }
 
   Real_t get_total_events_length() {
+    log_debug("Getting total event length...");
     auto events = tree.get_all_events();
+    log_debug("Gathered ", events.size(), " events.");
     Real_t events_length = 0.0;
-    std::for_each(events.begin(), events.end(),
-                  [&events_length, this](Event e) {
-                    events_length += this->cells.get_event_length(e);
-                  });
+    for (auto e: events) {
+      events_length += this->cells.get_event_length(e);
+    }
     return events_length;
   }
 
@@ -240,10 +196,11 @@ public:
   MHStepsExecutor<Real_t>(EventTree &t, CONETInputData<Real_t> &cells,
                           Random<Real_t> &r)
       : tree{t}, label_sampler{cells.get_loci_count() - 1,
-                               cells.get_chromosome_end_markers()},
+                               cells.get_chromosome_end_markers(), cells.snvs},
         node_sampler{tree}, cells{cells}, random{r} {
-    for (auto event : tree.get_all_events()) {
-      label_sampler.add_label(event);
+    for (auto node : tree.get_descendants(tree.get_root())) {
+      if (node != tree.get_root())
+          label_sampler.add_label(node->label);
     }
   }
 
@@ -276,9 +233,6 @@ public:
                                   move_data.nodes["parent_of_middle_node"]);
       }
       return;
-    case SWAP_ONE_BREAKPOINT:
-      swap_breakpoints_rollback(move_data);
-      return;
     }
   }
 
@@ -295,10 +249,8 @@ public:
     case PRUNE_REATTACH:
       return prune_and_reattach_move();
     case SWAP_SUBTREES:
-      return swap_subtrees_move();
-    case SWAP_ONE_BREAKPOINT:
     default:
-      return swap_breakpoints_move();
+      return swap_subtrees_move();
     }
   }
 
@@ -312,6 +264,7 @@ public:
     case PRUNE_REATTACH:
       return tree.get_size() >= 2;
     case SWAP_ONE_BREAKPOINT:
+      return false; 
     case SWAP_SUBTREES:
     case SWAP_LABELS:
     default:
@@ -320,13 +273,19 @@ public:
   }
 
   Real_t get_log_tree_prior() {
+    log_debug("TreeMHStepsExecutor: Getting tree prior for tree with size ", tree.get_size(), " tree cn size: ", tree.cn_size);
+    auto sample_label_kernel =  label_sampler.get_sample_label_log_kernel();
+    log_debug("Sampel label kernel: ", sample_label_kernel);
     const Real_t C = std::log((Real_t)tree.get_size()) -
-                     label_sampler.get_sample_label_log_kernel() +
+                     sample_label_kernel +
                      node_sampler.get_delete_leaf_kernel();
-    return -C * (Real_t)tree.get_size() -
+    log_debug("C constant: ", C, " total ev length: ", get_total_events_length());
+    Real_t result =  -C * (Real_t)tree.get_size() -
            EVENTS_LENGTH_PENALTY * get_total_events_length() -
            DATA_SIZE_PRIOR_CONSTANT * ((Real_t)cells.get_cells_count()) *
-               tree.get_size();
+               tree.cn_size;
+    log_debug("Result: ", result);
+    return result;
   }
 };
 #endif

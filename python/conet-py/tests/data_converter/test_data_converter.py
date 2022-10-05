@@ -3,8 +3,8 @@ import os
 import pandas as pd
 import pytest
 
-from conet.data_converter.corrected_counts import CorrectedCounts
-from conet.data_converter.data_converter import DataConverter
+from conet_wrapper.data_converter.corrected_counts import CorrectedCounts
+from conet_wrapper.data_converter.data_converter import DataConverter
 
 
 @pytest.fixture(autouse=True)

@@ -39,6 +39,7 @@ public:
   };
   typedef Node *NodeHandle;
 
+  size_t cn_size{1};
 private:
   // Tree is always rooted
   size_t size{1};
@@ -46,12 +47,20 @@ private:
   using NodeVector = std::vector<NodeHandle>;
 
   NodeHandle create_detached_node(TreeLabel label) {
-    return new Node(label, get_event_breakpoints(get_event_from_label(label)));
+    if (is_cn_event(label)) {
+      return new Node(label, get_event_breakpoints(get_event_from_label(label)));
+    }
+    return new Node(label, std::list<Locus>());
   }
 
   void
   gather_ancestor_breakpoints(Node *node,
                               std::unordered_set<Locus> &breakpoints) const {
+
+    if (!is_cn_event(node->label)) {
+      gather_ancestor_breakpoints(node->parent, breakpoints);
+      return;
+    }
     if (node != root) {
       for (Locus l : get_event_breakpoints(get_event_from_label(node->label))) {
         breakpoints.insert(l);
@@ -68,7 +77,9 @@ private:
    */
   void update_new_breakpoints(
       NodeHandle node, std::unordered_set<size_t> &breakpoints_from_ancestors) {
-    if (node != root) {
+    if (!is_cn_event(node->label)) {
+      node->new_breakpoints.clear();
+    } else if (node != root) {
       node->new_breakpoints =
           get_event_breakpoints(get_event_from_label(node->label));
       node->new_breakpoints.remove_if([&breakpoints_from_ancestors](Locus br) {
@@ -225,13 +236,13 @@ public:
 
   std::vector<Event> get_all_events() const {
     auto nodes = get_descendants(root);
-    nodes.erase(
-        std::remove_if(nodes.begin(), nodes.end(),
-                       [this](NodeHandle n) { return n == this->root; }));
     std::vector<Event> events;
-    std::transform(
-        nodes.begin(), nodes.end(), std::back_inserter(events),
-        [this](NodeHandle n) -> Event { return this->get_node_event(n); });
+    for (auto n : nodes) {
+        if (n == this->root || (!is_cn_event(n->label))) {
+          continue;
+        }
+        events.push_back(get_node_event(n));
+    }
     return events;
   }
 
@@ -267,6 +278,9 @@ public:
     attach_node(new_node, parent);
     update_new_breakpoints(new_node);
     size++;
+    if (is_cn_event(label)) {
+      cn_size++;
+    }
     return new_node;
   }
 
@@ -308,6 +322,9 @@ public:
   NodeHandle delete_leaf(NodeHandle node) {
     auto parent = node->parent;
     detach_node(node);
+    if (is_cn_event(node->label)) {
+      cn_size--;
+    }
     size--;
     delete node;
     return parent;
@@ -317,7 +334,7 @@ public:
    * @brief Changes label of node @node
    * Whether this will not result in node label duplication is up to the caller.
    */
-  void change_label(NodeHandle node, Event new_label) {
+  void change_label(NodeHandle node, TreeLabel new_label) {
     node->label = new_label;
     update_new_breakpoints(node);
   }
