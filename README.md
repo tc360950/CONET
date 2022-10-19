@@ -31,8 +31,20 @@ This project consists of 3 main components:
 * R script for advanced plots of inference results 
 
 # Installation
-
 ## In container 
+Use image *tc360950/conet_py_sing:latest*. At minimum, the entrypoint expects 3 arguments: 
+- data_dir - on container directory where CONET data will be stored (must end with /)
+- output_dir - on container directory where CONET output will be saved (must end with /)
+- corrected_counts_file - path to corrected counts file 
+
+Exemplary call may look as follows:
+
+*docker run -v /home/user/Desktop/CONET/:/data tc360950/conet_py_sing:latest --data_dir /data/ --output_dir /data/out/ --corrected_counts_file /data/SA501X3F_filtered_corrected_counts_chr_17_18_20_23.csv*
+
+Where SA501X3F_filtered_corrected_counts_chr_17_18_20_23.csv has been saved in /home/user/Desktop/CONET/ on host and we mount the directory to the container. 
+
+Other available parameters are described in *Usage Details* section 
+## In container with jupyter
 Use image defined in *CONET.Dockerfile*. It installs conet-py and compiles cpp CONET into executable 
 *~/conet-py/CONET*. If you want to install CONET locally it's easy to mimic steps executed in the image. 
 
