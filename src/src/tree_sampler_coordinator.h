@@ -58,20 +58,25 @@ template <class Real_t> class TreeSamplerCoordinator {
   }
 
   void move(MoveType type) {
+    SNVSolver<Real_t> snv_solver(mh_step_executor.cells);
+
+    auto snv_before = snv_solver.insert_snv_events(tree, likelihood_coordinator.get_max_attachment(), SNVParams<Real_t>(P_E, P_M, P_Q));
     recalculate_counts_dispersion_penalty();
     auto before_move_likelihood =
         temperature * likelihood_coordinator.get_likelihood() +
-        mh_step_executor.get_log_tree_prior() + tree_count_dispersion_penalty;
+        mh_step_executor.get_log_tree_prior() + tree_count_dispersion_penalty + snv_before;
 
     auto move_data = mh_step_executor.execute_move(type);
 
     auto after_move_likelihood =
         temperature * likelihood_coordinator.calculate_likelihood() +
         mh_step_executor.get_log_tree_prior();
+
+    auto max_attachment = likelihood_coordinator.calculate_max_attachment();
     auto after_move_counts_dispersion_penalty =
         dispersion_penalty_calculator.calculate_log_score(
-            tree, likelihood_coordinator.calculate_max_attachment());
-    after_move_likelihood += after_move_counts_dispersion_penalty;
+            tree, max_attachment);
+    after_move_likelihood += after_move_counts_dispersion_penalty + snv_solver.insert_snv_events(tree, max_attachment, SNVParams<Real_t>(P_E, P_M, P_Q));
 
     Real_t log_acceptance = after_move_likelihood - before_move_likelihood +
                             move_data.reverse_move_log_kernel -

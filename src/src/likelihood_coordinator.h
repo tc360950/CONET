@@ -14,6 +14,7 @@
 #include "utils/log_sum_accumulator.h"
 #include "utils/random.h"
 #include "utils/utils.h"
+#include "snv_likelihood.h"
 
 template <class Real_t> class LikelihoodCoordinator {
   using NodeHandle = EventTree::NodeHandle;
@@ -107,9 +108,14 @@ public:
 
   void resample_likelihood_parameters(Real_t log_tree_prior,
                                       Real_t tree_count_score) {
+    SNVSolver<Real_t> snv_solver(cells);
+
+    auto snv_before = snv_solver.insert_snv_events(tree, get_max_attachment(), SNVParams<Real_t>(P_E, P_M, P_Q));
+
     auto likelihood_before_move = get_likelihood() +
                                   likelihood.get_likelihood_parameters_prior() +
-                                  tree_count_score;
+                                  tree_count_score + snv_before;
+
     LikelihoodData<Real_t> previous_parameters = likelihood;
     auto log_move_kernels = execute_gibbs_step_for_parameters_resample();
     swap_likelihood_matrices();
@@ -118,6 +124,10 @@ public:
                                  likelihood.get_likelihood_parameters_prior() +
                                  counts_scoring.calculate_log_score(
                                      tree, tmp_calculator_state.max_attachment);
+    
+    auto snv_after = snv_solver.insert_snv_events(tree, tmp_calculator_state.max_attachment, SNVParams<Real_t>(P_E, P_M, P_Q));
+
+    likelihood_after_move += snv_after;
 
     if (!likelihood.likelihood_is_valid()) {
       swap_likelihood_matrices();

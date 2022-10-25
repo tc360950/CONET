@@ -9,6 +9,7 @@
 #include "tree/tree_node_sampler.h"
 #include "tree/vertex_label_sampler.h"
 #include "utils/random.h"
+#include "snv_likelihood.h"
 
 /**
  * This class is responsible for execution of MCMC moves on the EventTree
@@ -33,7 +34,7 @@ public:
           reverse_move_log_kernel{1.0} {}
   };
 
-private:
+public:
   EventTree &tree;
   VertexLabelSampler<Real_t> label_sampler;
   TreeNodeSampler<Real_t> node_sampler;

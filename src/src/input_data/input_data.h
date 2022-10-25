@@ -36,6 +36,11 @@ private:
       squared_counts; // Sums of squared CCs between consecutive breakpoint
                       // candidate loci
 public:
+  std::vector<std::vector<int>> B;
+  std::vector<std::vector<int>> D;
+  std::vector<SNVEvent> snvs;
+  std::vector<int> cluster_sizes; 
+public:
   CONETInputData(size_t loci_count, std::vector<size_t> chrom_m,
                  std::vector<Real_t> between)
       : loci_count{loci_count}, chromosome_markers{chrom_m},

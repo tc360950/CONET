@@ -37,8 +37,11 @@ int main(int argc, char **argv) {
 		("num_replicas",  po::value<size_t>()->default_value(5), "Number of tempered chain replicas in MAP event tree search.")
 		("threads_likelihood",  po::value<size_t>()->default_value(4), "Number of threads which will be used for the most demanding likelihood calculations.")
 		("verbose",  po::value<bool>()->default_value(true), "True if CONET should print messages during inference.")
-		("neutral_cn",  po::value<double>()->default_value(2.0), "Neutral copy number");
-	
+		("neutral_cn",  po::value<double>()->default_value(2.0), "Neutral copy number")
+		        ("e",  po::value<double>()->default_value(0.001), "Sequencing error")
+        ("m",  po::value<double>()->default_value(0.3), "Per allele coverage")
+        ("q",  po::value<double>()->default_value(0.00001), "Read success probability")
+		;
 	po::variables_map vm;
 	po::store(po::command_line_parser(argc, argv).options(description).run(), vm);
 	po::notify(vm);
@@ -62,11 +65,36 @@ int main(int argc, char **argv) {
 	THREADS_LIKELIHOOD = vm["threads_likelihood"].as<size_t>();
     VERBOSE = vm["verbose"].as<bool>();
     NEUTRAL_CN = vm["neutral_cn"].as<double>();
+	P_E = vm["e"].as<double>();
+    P_M = vm["m"].as<double>();
+    P_Q = vm["q"].as<double>();
 
 	Random<double> random(SEED);
     CONETInputData<double> provider = create_from_file(string(data_dir).append("ratios"), string(data_dir).append("counts"), string(data_dir).append("counts_squared"), ';');
     
+	log("Loading data for SNV extension...");
+    auto B = string_matrix_to_int(split_file_by_delimiter(string(data_dir).append("B"), ';'));
+    log("Loaded matrix of alternative reads with ", B.size(), " rows and ", B[0].size(), " columns");
+    auto D = string_matrix_to_int(split_file_by_delimiter(string(data_dir).append("D"), ';'));
+    log("Loaded matrix of total reads with ", D.size(), " rows and ", D[0].size(), " columns");
+    auto cluster_sizes = string_matrix_to_int(split_file_by_delimiter(string(data_dir).append("cluster_sizes"), ';'));
+    log("Loaded cluster sizes info...");
+    auto snvs = string_matrix_to_int(split_file_by_delimiter(string(data_dir).append("snvs_data"), ';'));
+    log("Loaded snv info data");
+    if (snvs.size() != D[0].size() || cluster_sizes.size() != D.size()) {
+        throw "Data sizes do not match!";
+    }
+    provider.D = D;
+    provider.B = B;
+    for (auto &el : cluster_sizes) {
+        provider.cluster_sizes.push_back(el[0]);
+    }
+    for (size_t i = 0; i < snvs.size(); i++) {
+        provider.snvs.push_back(SNVEvent(i, snvs[i][1]));
+    }
+
     log("Input files have been loaded successfully");
+
     ParallelTemperingCoordinator<double> PT(provider, random);
 	CONETInferenceResult<double> result = PT.simulate(param_inf_iters, pt_inf_iters);
 	log("Tree inference has finished");
@@ -76,5 +104,17 @@ int main(int argc, char **argv) {
 
 	std::ofstream attachment_file{ string(output_dir).append("inferred_attachment") };
 	attachment_file << result.attachment;
+
+	SNVSolver<double> snv_solver(provider);
+
+    auto snv_before = snv_solver.insert_snv_events(result.tree, result.attachment, SNVParams<double>(P_E, P_M, P_Q));
+
+	std::ofstream snv_file{ string(output_dir).append("inferred_snvs") };
+	for (auto n : snv_solver.likelihood.node_to_snv) {
+		
+		for (auto snv : n.second) {
+			snv_file << label_to_str(n.first->label) << ";" <<snv << "\n";
+		}
+	}
     return 0;
 }

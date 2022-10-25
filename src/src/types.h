@@ -10,6 +10,26 @@ using Locus = size_t;
 using Event = std::pair<Locus, Locus>;
 using TreeLabel = Event;
 
+class SNVEvent {
+public:
+size_t snv; 
+int lhs_locus; // -1 means there is none on the left hand side 
+
+bool overlaps_with_event(Event e) {
+  return e.first <= lhs_locus && e.second > lhs_locus;
+}
+
+bool operator==(const SNVEvent& a) const
+    {
+        return this->snv == a.snv;
+    }
+
+SNVEvent(size_t i, int l) {
+  snv = i; 
+  lhs_locus = l;
+}
+};
+
 std::pair<Event, Event> swap_breakpoints(Event brkp1, Event brkp2, int left,
                                          int right);
 

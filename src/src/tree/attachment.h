@@ -12,6 +12,7 @@
  *
  */
 class Attachment {
+public:
   std::vector<TreeLabel> cell_to_tree_label;
 
 public:
