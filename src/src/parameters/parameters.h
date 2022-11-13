@@ -19,5 +19,6 @@ extern double NEUTRAL_CN;
 extern double P_E;
 extern double P_M;
 extern double P_Q;
+extern double SNV_CONSTANT;
 
 #endif // !PARAMETERS_H

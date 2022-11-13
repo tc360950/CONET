@@ -40,8 +40,10 @@ int main(int argc, char **argv) {
 		("neutral_cn",  po::value<double>()->default_value(2.0), "Neutral copy number")
 		        ("e",  po::value<double>()->default_value(0.001), "Sequencing error")
         ("m",  po::value<double>()->default_value(0.3), "Per allele coverage")
-        ("q",  po::value<double>()->default_value(0.00001), "Read success probability")
-		;
+		 ("q",  po::value<double>()->default_value(0.0001), "Read success probability")
+        ("snv_constant",  po::value<double>()->default_value(1.0), "SNV penalty constant")
+
+				;
 	po::variables_map vm;
 	po::store(po::command_line_parser(argc, argv).options(description).run(), vm);
 	po::notify(vm);
@@ -68,6 +70,7 @@ int main(int argc, char **argv) {
 	P_E = vm["e"].as<double>();
     P_M = vm["m"].as<double>();
     P_Q = vm["q"].as<double>();
+	SNV_CONSTANT = vm["snv_constant"].as<double>();
 
 	Random<double> random(SEED);
     CONETInputData<double> provider = create_from_file(string(data_dir).append("ratios"), string(data_dir).append("counts"), string(data_dir).append("counts_squared"), ';');
@@ -107,6 +110,7 @@ int main(int argc, char **argv) {
 
 	SNVSolver<double> snv_solver(provider);
 
+	SNV_CONSTANT = 1.0;
     auto snv_before = snv_solver.insert_snv_events(result.tree, result.attachment, SNVParams<double>(P_E, P_M, P_Q));
 
 	std::ofstream snv_file{ string(output_dir).append("inferred_snvs") };

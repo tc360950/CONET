@@ -10,6 +10,7 @@
  */
 constexpr bool DEBUG = false;
 
+extern size_t counter; 
 void print();
 
 template <class A0, class... Args> void print(A0 a0, Args... args) {
@@ -27,6 +28,16 @@ template <class... Args> void log_debug(Args... args) {
   if (DEBUG) {
     print("Debug: ", args...);
   }
+}
+
+template <class... Args> void log_periodic(Args... args) {
+  if (counter % 1000 == 0) {
+    print(args...);
+  }
+}
+
+template <class... Args> void log_periodic_end(Args... args) {
+  counter ++;
 }
 
 #endif // !LOGGER_H

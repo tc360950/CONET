@@ -25,6 +25,9 @@ parser.add_argument('--verbose', type=bool, default=True)
 parser.add_argument('--neutral_cn', type=float, default=2.0)
 parser.add_argument('--output_dir', type=str, default='./')
 parser.add_argument('--end_bin_length', type=int, default=150000)
+parser.add_argument('--snv_constant', type=float, default=1.0)
+parser.add_argument('--add_chr_ends', type=bool, default=False)
+
 
 args = parser.parse_args()
 
@@ -46,7 +49,8 @@ def tree_to_newick(g, root=None):
 if __name__ == "__main__":
     corrected_counts: pd.DataFrame = pd.read_csv(args.corrected_counts_file)
     cc = CorrectedCounts(corrected_counts)
-    cc.add_chromosome_ends(neutral_cn=args.neutral_cn, end_bin_length=args.end_bin_length)
+    if args.add_chr_ends:
+        cc.add_chromosome_ends(neutral_cn=args.neutral_cn, end_bin_length=args.end_bin_length)
     DataConverter(event_length_normalizer=3095677412).create_CoNET_input_files(out_path=args.data_dir,
                                                                                               corrected_counts=cc)
     conet = CONET("./CONET", args.output_dir)
@@ -65,7 +69,8 @@ if __name__ == "__main__":
         threads_likelihood=args.threads_likelihood,
         verbose=args.verbose,
         neutral_cn=args.neutral_cn,
-        output_dir=args.output_dir
+        output_dir=args.output_dir,
+        snv_constant=args.snv_constant
     )
     conet.infer_tree(params)
     result = InferenceResult(params.output_dir, cc)
