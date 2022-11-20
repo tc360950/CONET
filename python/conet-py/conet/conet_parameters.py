@@ -21,6 +21,7 @@ class CONETParameters:
     neutral_cn: float = 2.0
     output_dir: str = "./"
     snv_constant: float = 1.0
+    use_snv_in_swap: bool = False
 
     def to_arg_value_pairs(self) -> List[Tuple[str, str]]:
         return [(f"--{key}", f"{value}") for key, value in dataclasses.asdict(self).items()]

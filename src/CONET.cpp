@@ -42,6 +42,7 @@ int main(int argc, char **argv) {
         ("m",  po::value<double>()->default_value(0.3), "Per allele coverage")
 		 ("q",  po::value<double>()->default_value(0.0001), "Read success probability")
         ("snv_constant",  po::value<double>()->default_value(1.0), "SNV penalty constant")
+		("use_snv_in_swap",  po::value<bool>()->default_value(false), "SNV penalty constant")
 
 				;
 	po::variables_map vm;
@@ -56,6 +57,7 @@ int main(int argc, char **argv) {
 	auto param_inf_iters = vm["param_inf_iters"].as<int>();
 	auto pt_inf_iters = vm["pt_inf_iters"].as<int>();
 
+	USE_SNV_IN_SWAP = vm["use_snv_in_swap"].as<bool>();
 	COUNTS_SCORE_CONSTANT_0 = vm["counts_penalty_s1"].as<double>();
 	COUNTS_SCORE_CONSTANT_1 = vm["counts_penalty_s2"].as<double>();
 	EVENTS_LENGTH_PENALTY = vm["event_length_penalty_k0"].as<double>();

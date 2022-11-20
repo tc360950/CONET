@@ -36,7 +36,7 @@ template <class Real_t> class TreeSamplerCoordinator {
   Utils::MaxValueAccumulator<CONETInferenceResult<Real_t>, Real_t>
       best_found_tree;
   MHStepsExecutor<Real_t> mh_step_executor;
-
+  size_t move_count = 0; 
   Real_t get_probability_of_reverse_move(MoveType type) {
     switch (type) {
     case ADD_LEAF:
@@ -60,7 +60,7 @@ template <class Real_t> class TreeSamplerCoordinator {
   void move(MoveType type) {
     SNVSolver<Real_t> snv_solver(mh_step_executor.cells);
 
-    auto snv_before = snv_solver.insert_snv_events(tree, likelihood_coordinator.get_max_attachment(), SNVParams<Real_t>(P_E, P_M, P_Q));
+    auto snv_before = snv_solver.insert_snv_events(move_count, tree, likelihood_coordinator.get_max_attachment(), SNVParams<Real_t>(P_E, P_M, P_Q));
     recalculate_counts_dispersion_penalty();
     auto before_move_likelihood =
         temperature * likelihood_coordinator.get_likelihood() +
@@ -80,7 +80,7 @@ template <class Real_t> class TreeSamplerCoordinator {
 
     auto max_attachment = likelihood_coordinator.calculate_max_attachment();
     auto after_move_counts_dispersion_penalty = dispersion_penalty_calculator.calculate_log_score(tree, max_attachment);
-    auto after_move_snv  = snv_solver.insert_snv_events(tree, max_attachment, SNVParams<Real_t>(P_E, P_M, P_Q));
+    auto after_move_snv  = snv_solver.insert_snv_events(move_count, tree, max_attachment, SNVParams<Real_t>(P_E, P_M, P_Q));
 
 
 
@@ -111,6 +111,7 @@ template <class Real_t> class TreeSamplerCoordinator {
       mh_step_executor.rollback_move(type, move_data);
       log_debug("Move rejected");
     }
+    move_count++;
   }
 
   MoveType sample_move_type() {
@@ -139,7 +140,13 @@ public:
                                                                  random} {}
 
   Real_t get_likelihood_without_priors_and_penalty() {
-    return likelihood_coordinator.get_likelihood();
+    if (!USE_SNV_IN_SWAP) {
+      return likelihood_coordinator.get_likelihood();
+    } else {
+      SNVSolver<Real_t> snv_solver(mh_step_executor.cells);
+      auto snv_before = snv_solver.insert_snv_events(tree, likelihood_coordinator.get_max_attachment(), SNVParams<Real_t>(P_E, P_M, P_Q));
+      return likelihood_coordinator.get_likelihood() + SNV_CONSTANT * snv_before;
+    }
   }
 
   void set_temperature(Real_t temperature) { this->temperature = temperature; }

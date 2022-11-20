@@ -20,5 +20,6 @@ extern double P_E;
 extern double P_M;
 extern double P_Q;
 extern double SNV_CONSTANT;
+extern bool USE_SNV_IN_SWAP;
 
 #endif // !PARAMETERS_H
