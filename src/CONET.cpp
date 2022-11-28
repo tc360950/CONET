@@ -43,6 +43,8 @@ int main(int argc, char **argv) {
 		 ("q",  po::value<double>()->default_value(0.0001), "Read success probability")
         ("snv_constant",  po::value<double>()->default_value(1.0), "SNV penalty constant")
 		("use_snv_in_swap",  po::value<bool>()->default_value(false), "SNV penalty constant")
+		("snv_batch_size",  po::value<size_t>()->default_value(0))
+		("snv_burnin",  po::value<size_t>()->default_value(0))
 
 				;
 	po::variables_map vm;
@@ -58,6 +60,8 @@ int main(int argc, char **argv) {
 	auto pt_inf_iters = vm["pt_inf_iters"].as<int>();
 
 	USE_SNV_IN_SWAP = vm["use_snv_in_swap"].as<bool>();
+	SNV_BATCH_SIZE = vm["snv_batch_size"].as<size_t>();
+	SNV_BURNIN = vm["snv_burnin"].as<size_t>();
 	COUNTS_SCORE_CONSTANT_0 = vm["counts_penalty_s1"].as<double>();
 	COUNTS_SCORE_CONSTANT_1 = vm["counts_penalty_s2"].as<double>();
 	EVENTS_LENGTH_PENALTY = vm["event_length_penalty_k0"].as<double>();
@@ -76,7 +80,8 @@ int main(int argc, char **argv) {
 
 	Random<double> random(SEED);
     CONETInputData<double> provider = create_from_file(string(data_dir).append("ratios"), string(data_dir).append("counts"), string(data_dir).append("counts_squared"), ';');
-    
+
+    log("SNV batch size: ", SNV_BATCH_SIZE);
 	log("Loading data for SNV extension...");
     auto B = string_matrix_to_int(split_file_by_delimiter(string(data_dir).append("B"), ';'));
     log("Loaded matrix of alternative reads with ", B.size(), " rows and ", B[0].size(), " columns");
@@ -99,7 +104,9 @@ int main(int argc, char **argv) {
     }
 
     log("Input files have been loaded successfully");
-
+    auto snv_constant_backup = SNV_CONSTANT;
+    {
+//    SNV_CONSTANT = 0.0;
     ParallelTemperingCoordinator<double> PT(provider, random);
 	CONETInferenceResult<double> result = PT.simulate(param_inf_iters, pt_inf_iters);
 	log("Tree inference has finished");
@@ -114,7 +121,8 @@ int main(int argc, char **argv) {
 
 	SNV_CONSTANT = 1.0;
     auto snv_before = snv_solver.insert_snv_events(result.tree, result.attachment, SNVParams<double>(P_E, P_M, P_Q));
-
+    }
+    std::cout << "\nSNV likelihood: " << snv_before;
 	std::ofstream snv_file{ string(output_dir).append("inferred_snvs") };
 	for (auto n : snv_solver.likelihood.node_to_snv) {
 		

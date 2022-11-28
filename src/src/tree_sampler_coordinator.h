@@ -58,9 +58,14 @@ template <class Real_t> class TreeSamplerCoordinator {
   }
 
   void move(MoveType type) {
-    SNVSolver<Real_t> snv_solver(mh_step_executor.cells);
-
-    auto snv_before = snv_solver.insert_snv_events(move_count, tree, likelihood_coordinator.get_max_attachment(), SNVParams<Real_t>(P_E, P_M, P_Q));
+    Real_t snv_before = 0.0;
+    {
+        SNVSolver<Real_t> snv_solver(mh_step_executor.cells);
+        snv_before = snv_solver.insert_snv_events(move_count, tree, likelihood_coordinator.get_max_attachment(), SNVParams<Real_t>(P_E, P_M, P_Q));
+    }
+    if (USE_SNV_IN_SWAP) {
+        snv_before = temperature * snv_before;
+    }
     recalculate_counts_dispersion_penalty();
     auto before_move_likelihood =
         temperature * likelihood_coordinator.get_likelihood() +
@@ -80,8 +85,15 @@ template <class Real_t> class TreeSamplerCoordinator {
 
     auto max_attachment = likelihood_coordinator.calculate_max_attachment();
     auto after_move_counts_dispersion_penalty = dispersion_penalty_calculator.calculate_log_score(tree, max_attachment);
-    auto after_move_snv  = snv_solver.insert_snv_events(move_count, tree, max_attachment, SNVParams<Real_t>(P_E, P_M, P_Q));
 
+    Real_t after_move_snv = 0.0;
+    {
+        SNVSolver<Real_t> snv_solver(mh_step_executor.cells);
+        after_move_snv  = snv_solver.insert_snv_events(move_count, tree, max_attachment, SNVParams<Real_t>(P_E, P_M, P_Q));
+    }
+    if (USE_SNV_IN_SWAP) {
+        after_move_snv = temperature * after_move_snv;
+    }
 
 
     log_periodic("SNV likelihood after move ", after_move_snv, " CONET likelihood: ", 
@@ -111,7 +123,6 @@ template <class Real_t> class TreeSamplerCoordinator {
       mh_step_executor.rollback_move(type, move_data);
       log_debug("Move rejected");
     }
-    move_count++;
   }
 
   MoveType sample_move_type() {
@@ -182,6 +193,7 @@ public:
         CONETInferenceResult<Real_t>(
             tree, likelihood_coordinator.get_max_attachment(), l),
         l);
+    move_count++;
   }
 
   CONETInferenceResult<Real_t> get_inferred_tree() {

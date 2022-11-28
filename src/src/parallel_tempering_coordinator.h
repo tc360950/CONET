@@ -79,6 +79,8 @@ template <class Real_t> class ParallelTemperingCoordinator {
   estimate_likelihood_parameters(LikelihoodData<Real_t> likelihood,
                                  const size_t iterations) {
     log("Starting parameter MCMC estimation...");
+    auto snv_likelihood_cont = SNV_CONSTANT;
+    SNV_CONSTANT = 0.0;
     EventTree tree = sample_starting_tree_for_chain();
     LikelihoodCoordinator<Real_t> calc(likelihood, tree, provider,
                                        random.next_int());
@@ -102,10 +104,13 @@ template <class Real_t> class ParallelTemperingCoordinator {
         map_parameters.brkp_likelihood.to_string());
     log("Estimated no-breakpoint distribution: ",
         map_parameters.no_brkp_likelihood.to_string());
+    SNV_CONSTANT = snv_likelihood_cont;
     return map_parameters;
   }
 
   void mcmc_simulation(size_t iterations) {
+    auto snv_likelihood_const = SNV_CONSTANT;
+    SNV_CONSTANT = 0.0;
     for (size_t i = 0; i < iterations / NUMBER_OF_MOVES_BETWEEN_SWAPS; i++) {
       std::vector<std::thread> threads;
       for (size_t th = 0; th < NUM_REPLICAS; th++) {
@@ -128,6 +133,9 @@ template <class Real_t> class ParallelTemperingCoordinator {
             this->likelihood_calculators[0]->get_likelihood());
         log("Log-likelihood with penalty: ",
             this->tree_sampling_coordinators[0]->get_total_likelihood());
+      }
+      if (i * NUMBER_OF_MOVES_BETWEEN_SWAPS > SNV_BURNIN) {
+        SNV_CONSTANT = snv_likelihood_const;
       }
     }
   }

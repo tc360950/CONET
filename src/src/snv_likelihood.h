@@ -20,9 +20,9 @@ public:
   std::vector<Real_t> cache_;
 
   NegBinomCalc<Real_t> () {
-    cache_.resize(5000000);
+    cache_.resize(10000000);
     cache_[0] = std::log(1);
-    for (size_t i = 1; i < 5000000; i++) {
+    for (size_t i = 1; i < 10000000; i++) {
       cache_[i] = cache_[i-1] + std::log((Real_t) i);
     }
   }
@@ -42,7 +42,7 @@ public:
   }
   Real_t get(size_t num_failures,  Real_t prob, size_t d) {
       Real_t result = num_failures * std::log(prob) + d * std::log(1.0 - prob);
-      return result + log_factorial(num_failures + d - 1) - log_factorial(num_failures - 1);
+      return result + log_factorial(num_failures + d - 1) - log_factorial(num_failures - 1) - log_factorial(d);
   }
 };
 
@@ -259,9 +259,9 @@ public:
 
     std::map<NodeHandle, std::set<size_t>> node_to_snv; 
 
-    void calculate_d_lik(SNVParams<Real_t> &p) {
+    void calculate_d_lik(SNVParams<Real_t> &p, size_t start, size_t end) {
       for (size_t cell = 0; cell < D_log_lik.size(); cell++) {
-        for (size_t snv = 0; snv < D_log_lik[cell].size(); snv++) {
+        for (size_t snv = start; snv < end; snv++) {
             auto d = D[cell][snv];
             auto cn = CN_matrix[cell][snv];
             auto cluster_size = cluster_sizes[cell];
@@ -406,18 +406,19 @@ public:
       }
     }
 
-    Real_t get_total_likelihood(SNVParams<Real_t> p, EventTree &tree, Attachment &a) {
-            auto label_to_node = map_label_to_node(tree);
+    Real_t get_total_likelihood(SNVParams<Real_t> p, EventTree &tree, Attachment &a, size_t start, size_t end) {
+        end = std::min(end, snvs.size());
+      auto label_to_node = map_label_to_node(tree);
       auto label_to_cell = a.get_node_label_to_cells_map();
-      calculate_d_lik(p);
+      calculate_d_lik(p, start, end);
       log_debug("Calculating b likelihood...");
-      for (size_t snv = 0; snv < snvs.size(); snv++) {
+      for (size_t snv = start; snv < end; snv++) {
           calculate_b_lik_for_SN_acquire(p, tree, snv, label_to_node, label_to_cell, a);
       }
       Real_t result = 0.0; 
       for (size_t cell = 0; cell < CN_matrix.size(); cell++) {
-        result += std::accumulate(D_log_lik[cell].begin(), D_log_lik[cell].end(), 0.0);
-        result += std::accumulate(B_log_lik[cell].begin(), B_log_lik[cell].end(), 0.0);
+        result += std::accumulate(D_log_lik[cell].begin()+ start, D_log_lik[cell].begin() + end, 0.0);
+        result += std::accumulate(B_log_lik[cell].begin()+ start, B_log_lik[cell].begin() + end, 0.0);
       }
       log_debug("Result: ", result);
       return result; 
@@ -474,7 +475,7 @@ public:
         return 0.0;
       }
       likelihood.init(tree, at);
-      
+
       log_debug("Initialized snv likelihood calculator");
 
       auto label_to_node = map_label_to_node(tree);
@@ -509,7 +510,7 @@ public:
           }
         } while(snv_added);
       }
-      return likelihood.get_total_likelihood(p, tree, at);
+      return likelihood.get_total_likelihood(p, tree, at, 0, cells.snvs.size());
   }
 
   Real_t insert_snv_events(size_t move_count, EventTree& tree, Attachment& at, SNVParams<Real_t> p) {
@@ -519,13 +520,23 @@ public:
       likelihood.init(tree, at);
       
       log_debug("Initialized snv likelihood calculator");
-      size_t snvs_batch = move_count % 10;
-      size_t batch_size = cells.snvs.size() / 10; 
+
+      size_t snvs_batch = 0;
+      size_t batch_size = cells.snvs.size();
+
+      if (SNV_BATCH_SIZE > 0) {
+        size_t batches = cells.snvs.size() / SNV_BATCH_SIZE;
+        if (batches * SNV_BATCH_SIZE < cells.snvs.size()) {
+            batches++;
+        }
+        snvs_batch = (move_count % batches) * SNV_BATCH_SIZE;
+        batch_size = SNV_BATCH_SIZE;
+      }
 
       auto label_to_node = map_label_to_node(tree);
       auto label_to_cell = at.get_node_label_to_cells_map();
 
-      for (size_t snv = snvs_batch; snv < snvs_batch + batch_size; snv++) {
+      for (size_t snv = snvs_batch; snv < snvs_batch + batch_size && snv < cells.snvs.size(); snv++) {
         auto nodes = tree.get_descendants(tree.get_root());
         std::set<NodeHandle> nodes_{nodes.begin(), nodes.end()};
         nodes_.erase(tree.get_root());
@@ -554,7 +565,7 @@ public:
           }
         } while(snv_added);
       }
-      return likelihood.get_total_likelihood(p, tree, at);
+      return likelihood.get_total_likelihood(p, tree, at, snvs_batch, snvs_batch + batch_size);
   }
 
 
