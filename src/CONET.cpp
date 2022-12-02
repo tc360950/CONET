@@ -79,50 +79,95 @@ int main(int argc, char **argv) {
 	SNV_CONSTANT = vm["snv_constant"].as<double>();
 
 	Random<double> random(SEED);
-    CONETInputData<double> provider = create_from_file(string(data_dir).append("ratios"), string(data_dir).append("counts"), string(data_dir).append("counts_squared"), ';');
-
-    log("SNV batch size: ", SNV_BATCH_SIZE);
-	log("Loading data for SNV extension...");
-    auto B = string_matrix_to_int(split_file_by_delimiter(string(data_dir).append("B"), ';'));
-    log("Loaded matrix of alternative reads with ", B.size(), " rows and ", B[0].size(), " columns");
-    auto D = string_matrix_to_int(split_file_by_delimiter(string(data_dir).append("D"), ';'));
-    log("Loaded matrix of total reads with ", D.size(), " rows and ", D[0].size(), " columns");
-    auto cluster_sizes = string_matrix_to_int(split_file_by_delimiter(string(data_dir).append("cluster_sizes"), ';'));
-    log("Loaded cluster sizes info...");
-    auto snvs = string_matrix_to_int(split_file_by_delimiter(string(data_dir).append("snvs_data"), ';'));
-    log("Loaded snv info data");
-    if (snvs.size() != D[0].size() || cluster_sizes.size() != D.size()) {
-        throw "Data sizes do not match!";
-    }
-    provider.D = D;
-    provider.B = B;
-    for (auto &el : cluster_sizes) {
-        provider.cluster_sizes.push_back(el[0]);
-    }
-    for (size_t i = 0; i < snvs.size(); i++) {
-        provider.snvs.push_back(SNVEvent(i, snvs[i][1]));
-    }
 
     log("Input files have been loaded successfully");
     auto snv_constant_backup = SNV_CONSTANT;
+    std::vector<CONETInferenceResult<double>> results;
+    std::vector<double> snv_likelihoods;
+    for (size_t i = 0; i < 1; i++)
     {
-//    SNV_CONSTANT = 0.0;
-    ParallelTemperingCoordinator<double> PT(provider, random);
-	CONETInferenceResult<double> result = PT.simulate(param_inf_iters, pt_inf_iters);
-	log("Tree inference has finished");
+        CONETInputData<double> provider = create_from_file(string(data_dir).append("ratios"), string(data_dir).append("counts"), string(data_dir).append("counts_squared"), ';');
 
-	std::ofstream tree_file{ string(output_dir).append("inferred_tree") };
-	tree_file << TreeFormatter::to_string_representation(result.tree);
-
-	std::ofstream attachment_file{ string(output_dir).append("inferred_attachment") };
-	attachment_file << result.attachment;
-
-	SNVSolver<double> snv_solver(provider);
-
-	SNV_CONSTANT = 1.0;
-    auto snv_before = snv_solver.insert_snv_events(result.tree, result.attachment, SNVParams<double>(P_E, P_M, P_Q));
+        log("SNV batch size: ", SNV_BATCH_SIZE);
+        log("Loading data for SNV extension...");
+        auto B = string_matrix_to_int(split_file_by_delimiter(string(data_dir).append("B"), ';'));
+        log("Loaded matrix of alternative reads with ", B.size(), " rows and ", B[0].size(), " columns");
+        auto D = string_matrix_to_int(split_file_by_delimiter(string(data_dir).append("D"), ';'));
+        log("Loaded matrix of total reads with ", D.size(), " rows and ", D[0].size(), " columns");
+        auto cluster_sizes = string_matrix_to_int(split_file_by_delimiter(string(data_dir).append("cluster_sizes"), ';'));
+        log("Loaded cluster sizes info...");
+        auto snvs = string_matrix_to_int(split_file_by_delimiter(string(data_dir).append("snvs_data"), ';'));
+        log("Loaded snv info data");
+        if (snvs.size() != D[0].size() || cluster_sizes.size() != D.size()) {
+            throw "Data sizes do not match!";
+        }
+        provider.D = D;
+        provider.B = B;
+        for (auto &el : cluster_sizes) {
+            provider.cluster_sizes.push_back(el[0]);
+        }
+        for (size_t i = 0; i < snvs.size(); i++) {
+            provider.snvs.push_back(SNVEvent(i, snvs[i][1]));
+        }
+        SNV_CONSTANT = 0.0;
+        ParallelTemperingCoordinator<double> PT(provider, random);
+        CONETInferenceResult<double> result = PT.simulate(param_inf_iters, pt_inf_iters);
+        log("Tree inference has finished");
+        results.push_back(result);
+        SNVSolver<double> snv_solver(provider);
+        SNV_CONSTANT = 1.0;
+        auto snv_lik = snv_solver.insert_snv_events(result.tree, result.attachment, SNVParams<double>(P_E, P_M, P_Q));
+        snv_likelihoods.push_back(snv_lik);
+        std::cout << "Finished CONET SNV replica " << i << "\n";
     }
-    std::cout << "\nSNV likelihood: " << snv_before;
+    SNV_CONSTANT = 1.0;
+    CONETInputData<double> provider = create_from_file(string(data_dir).append("ratios"), string(data_dir).append("counts"), string(data_dir).append("counts_squared"), ';');
+
+        log("SNV batch size: ", SNV_BATCH_SIZE);
+        log("Loading data for SNV extension...");
+        auto B = string_matrix_to_int(split_file_by_delimiter(string(data_dir).append("B"), ';'));
+        log("Loaded matrix of alternative reads with ", B.size(), " rows and ", B[0].size(), " columns");
+        auto D = string_matrix_to_int(split_file_by_delimiter(string(data_dir).append("D"), ';'));
+        log("Loaded matrix of total reads with ", D.size(), " rows and ", D[0].size(), " columns");
+        auto cluster_sizes = string_matrix_to_int(split_file_by_delimiter(string(data_dir).append("cluster_sizes"), ';'));
+        log("Loaded cluster sizes info...");
+        auto snvs = string_matrix_to_int(split_file_by_delimiter(string(data_dir).append("snvs_data"), ';'));
+        log("Loaded snv info data");
+        if (snvs.size() != D[0].size() || cluster_sizes.size() != D.size()) {
+            throw "Data sizes do not match!";
+        }
+        provider.D = D;
+        provider.B = B;
+        for (auto &el : cluster_sizes) {
+            provider.cluster_sizes.push_back(el[0]);
+        }
+        for (size_t i = 0; i < snvs.size(); i++) {
+            provider.snvs.push_back(SNVEvent(i, snvs[i][1]));
+        }
+
+    bool max_set = false;
+    double max = 0.0;
+    size_t max_idx = 0;
+    for (size_t i = 0; i < results.size(); i++) {
+
+        if (!max_set || results[i].likelihood + snv_constant_backup * snv_likelihoods[i] > max) {
+            max_set = true;
+            max = results[i].likelihood + snv_constant_backup * snv_likelihoods[i];
+            max_idx = i;
+        }
+    }
+
+      std::ofstream tree_file{ string(output_dir).append("inferred_tree") };
+        tree_file << TreeFormatter::to_string_representation(results[max_idx].tree);
+        std::ofstream attachment_file{ string(output_dir).append("inferred_attachment") };
+        attachment_file << results[max_idx].attachment;
+
+
+    SNVSolver<double> snv_solver(provider);
+        SNV_CONSTANT = snv_constant_backup;
+        auto snv_before  = snv_solver.insert_snv_events(results[max_idx].tree, results[max_idx].attachment, SNVParams<double>(P_E, P_M, P_Q));
+
+        std::cout << "\nSNV likelihood: " << snv_before;
 	std::ofstream snv_file{ string(output_dir).append("inferred_snvs") };
 	for (auto n : snv_solver.likelihood.node_to_snv) {
 		

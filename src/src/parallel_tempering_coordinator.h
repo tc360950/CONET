@@ -94,7 +94,8 @@ template <class Real_t> class ParallelTemperingCoordinator {
             coordinator.get_current_count_dispersion_penalty());
       }
       coordinator.execute_metropolis_hastings_step();
-      log("step ", i);
+      if (i % 100 == 0)
+        log("step ", i);
     }
     log("Finished parameter estimation");
     auto map_parameters =

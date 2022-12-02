@@ -21,13 +21,15 @@ class InferenceResult:
         self.inferred_snvs = self.__get_inferred_snvs(output_path + "inferred_snvs")
 
     def __get_inferred_snvs(self, path: str):
+        brkp_candidates = self.__cc.get_brkp_candidate_loci_idx()
         def parse_line(line):
             node = eval(line.split(";")[0])
             snv = int(line.split(";")[1])
-            node = self.__node_to_pretty(node)
             if node == (0,0):
                 return f"0;0;{snv}"
             else:
+                node = (brkp_candidates[node[0]], brkp_candidates[node[1]])
+                node = self.__node_to_pretty(node)
                 return f"{int(node['chr'])}__{int(node['bin_start'])};{int(node['chr'])}__{int(node['bin_end'])};{snv}"
 
         with open(path, "r") as f:
@@ -50,7 +52,7 @@ class InferenceResult:
                         [cells[i], str(i), f"{int(self.attachment[i]['chr'])}_{self.attachment[i]['bin_start']}",
                          f"{int(self.attachment[i]['chr'])}_{self.attachment[i]['bin_end']}\n"]))
 
-        with open(dir + "inferred_snvs", 'w') as f:
+        with open(dir + "inferred_snvs2", 'w') as f:
             for s in self.inferred_snvs:
                 f.write(f"{s}\n")
         numpy.savetxt(dir + "inferred_counts", X=self.get_inferred_copy_numbers(neutral_cn), delimiter=";")

@@ -143,7 +143,7 @@ public:
               std::to_string(acceptance_ratio));
     log_debug("Log kernels ", std::to_string(log_move_kernels.second), " ",
               std::to_string(log_move_kernels.first));
-    if (random.log_uniform() <= acceptance_ratio) {
+    if (random.log_uniform() <= acceptance_ratio || !map_parameters.data.has_value() ) {
       log_debug("Accepting parameters change");
       map_parameters.update(likelihood, likelihood_after_move + log_tree_prior);
       persist_likelihood_calculation_result();
