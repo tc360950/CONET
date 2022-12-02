@@ -30,6 +30,7 @@ parser.add_argument('--add_chr_ends', type=bool, default=False)
 parser.add_argument('--use_snv_in_swap', type=bool, default=False)
 parser.add_argument('--snv_batch_size', type=int, default=0)
 parser.add_argument('--snv_burnin', type=int, default=0)
+parser.add_argument('--tries', type=int, default=10)
 
 args = parser.parse_args()
 
@@ -75,7 +76,8 @@ if __name__ == "__main__":
         snv_constant=args.snv_constant,
         use_snv_in_swap=args.use_snv_in_swap,
         snv_batch_size=args.snv_batch_size,
-        snv_burnin=args.snv_burnin
+        snv_burnin=args.snv_burnin,
+        tries=args.tries
     )
     conet.infer_tree(params)
     result = InferenceResult(params.output_dir, cc)

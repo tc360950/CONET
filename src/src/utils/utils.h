@@ -16,6 +16,7 @@ template <class T> std::vector<T> flatten(std::vector<std::vector<T>> vec) {
 }
 
 template <class T, class Real_t> class MaxValueAccumulator {
+public:
   Real_t value;
   std::optional<T> data;
 

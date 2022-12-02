@@ -45,12 +45,14 @@ int main(int argc, char **argv) {
 		("use_snv_in_swap",  po::value<bool>()->default_value(false), "SNV penalty constant")
 		("snv_batch_size",  po::value<size_t>()->default_value(0))
 		("snv_burnin",  po::value<size_t>()->default_value(0))
+		("tries",  po::value<size_t>()->default_value(10))
 
 				;
 	po::variables_map vm;
 	po::store(po::command_line_parser(argc, argv).options(description).run(), vm);
 	po::notify(vm);
-	
+
+	size_t TRIES = vm["tries"].as<size_t>();
 	auto data_dir = vm["data_dir"].as<string>();
 	auto output_dir = vm["output_dir"].as<string>();
     if(data_dir.back() != '/') data_dir.push_back('/');
@@ -104,31 +106,59 @@ int main(int argc, char **argv) {
     }
 
     log("Input files have been loaded successfully");
-    auto snv_constant_backup = SNV_CONSTANT;
+
+    std::vector<CONETInferenceResult<double>> results;
+    std::vector<double> snv_likelihoods;
+    for (size_t i = 0; i < TRIES; i++)
     {
-//    SNV_CONSTANT = 0.0;
-    ParallelTemperingCoordinator<double> PT(provider, random);
-	CONETInferenceResult<double> result = PT.simulate(param_inf_iters, pt_inf_iters);
-	log("Tree inference has finished");
+        log("Starting try ", i);
+        SNV_CONSTANT = 0.0;
+        ParallelTemperingCoordinator<double> PT(provider, random);
+        CONETInferenceResult<double> result = PT.simulate(param_inf_iters, pt_inf_iters);
+        log("Tree inference has finished");
+        results.push_back(result);
+        SNVSolver<double> snv_solver(provider);
 
-	std::ofstream tree_file{ string(output_dir).append("inferred_tree") };
-	tree_file << TreeFormatter::to_string_representation(result.tree);
-
-	std::ofstream attachment_file{ string(output_dir).append("inferred_attachment") };
-	attachment_file << result.attachment;
-
-	SNVSolver<double> snv_solver(provider);
-
-	SNV_CONSTANT = 1.0;
-    auto snv_before = snv_solver.insert_snv_events(result.tree, result.attachment, SNVParams<double>(P_E, P_M, P_Q));
+        SNV_CONSTANT = 1.0;
+        log("Inferring SNVs");
+        auto snv_lik = snv_solver.insert_snv_events(result.tree, result.attachment, SNVParams<double>(P_E, P_M, P_Q));
+        snv_likelihoods.push_back(snv_lik);
     }
-    std::cout << "\nSNV likelihood: " << snv_before;
-	std::ofstream snv_file{ string(output_dir).append("inferred_snvs") };
-	for (auto n : snv_solver.likelihood.node_to_snv) {
-		
-		for (auto snv : n.second) {
-			snv_file << label_to_str(n.first->label) << ";" <<snv << "\n";
-		}
-	}
+
+
+    for(size_t i = 0; i < 6; i++) {
+        double constant = i == 0 ? 0.0 : 1.0 / std::pow(10.0, (double) (i - 1));
+
+        bool max_set = false;
+        double max_score = 0.0;
+        size_t max_indx = 0;
+
+        for (size_t j =0; j < results.size(); j++) {
+            if (!max_set || results[j].likelihood + constant * snv_likelihoods[j] > max_score) {
+                max_set = true;
+                max_indx = j;
+                max_score = results[j].likelihood + constant * snv_likelihoods[j] > max_score;
+            }
+        }
+
+
+        std::ofstream tree_file{ string(output_dir).append("inferred_tree_").append(std::to_string(i)) };
+        tree_file << TreeFormatter::to_string_representation(results[max_indx].tree);
+
+        std::ofstream attachment_file{ string(output_dir).append("inferred_attachment_").append(std::to_string(i)) };
+        attachment_file << results[max_indx].attachment;
+
+
+        SNV_CONSTANT = 1.0;
+        SNVSolver<double> snv_solver(provider);
+        auto snv_before = snv_solver.insert_snv_events(results[max_indx].tree, results[max_indx].attachment, SNVParams<double>(P_E, P_M, P_Q));
+        std::ofstream snv_file{ string(output_dir).append("inferred_snvs_").append(std::to_string(i)) };
+        for (auto n : snv_solver.likelihood.node_to_snv) {
+            for (auto snv : n.second) {
+                snv_file << label_to_str(n.first->label) << ";" <<snv << "\n";
+            }
+        }
+
+    }
     return 0;
 }
