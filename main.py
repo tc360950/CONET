@@ -80,17 +80,8 @@ if __name__ == "__main__":
         tries=args.tries
     )
     conet.infer_tree(params)
-    result = InferenceResult(params.output_dir, cc)
-    inferred_counts = np.transpose(result.get_inferred_copy_numbers(neutral_cn=int(params.neutral_cn)))
-    np.savetxt(f"{params.output_dir}inferred_counts", inferred_counts)
-    result = InferenceResult(args.output_dir, cc)
+    for i in range(6):
+        result = InferenceResult(params.output_dir, cc, str(i))
+        result.dump_results_to_dir(args.output_dir, neutral_cn=args.neutral_cn)
 
-    result.dump_results_to_dir(args.output_dir, neutral_cn=args.neutral_cn)
-
-    newick = tree_to_newick(result.inferred_tree)
-    newick = newick.replace("\"", "").replace("}", ">").replace("{", "<").replace(":", "")
-    with open(f"{args.output_dir}tree_newick", "w") as f:
-        f.write(
-            newick
-        )
 

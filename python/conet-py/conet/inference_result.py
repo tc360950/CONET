@@ -9,16 +9,18 @@ from conet.data_converter.corrected_counts import CorrectedCounts
 
 
 class InferenceResult:
-    def __init__(self, output_path: str, cc: CorrectedCounts):
+    def __init__(self, output_path: str, cc: CorrectedCounts, postfix: str):
         if not output_path.endswith('/'):
             output_path = output_path + '/'
 
+
+        self.postfix = postfix
         self.__cc = cc
-        self.__tree = self.__load_inferred_tree(output_path + "inferred_tree")
-        self.__attachment = self.__load_attachment(output_path + "inferred_attachment")
+        self.__tree = self.__load_inferred_tree(output_path + "inferred_tree_" + postfix)
+        self.__attachment = self.__load_attachment(output_path + "inferred_attachment_" + postfix)
         self.inferred_tree = self.__get_pretty_tree()
         self.attachment = self.__get_pretty_attachment()
-        self.inferred_snvs = self.__get_inferred_snvs(output_path + "inferred_snvs")
+        self.inferred_snvs = self.__get_inferred_snvs(output_path + "inferred_snvs_" + postfix)
 
     def __get_inferred_snvs(self, path: str):
         def parse_line(line):
@@ -40,7 +42,7 @@ class InferenceResult:
     def dump_results_to_dir(self, dir: str, neutral_cn: int) -> None:
         if not dir.endswith('/'):
             dir = dir + '/'
-        with open(dir + "inferred_attachment", 'w') as f:
+        with open(dir + f"inferred_attachment_{self.postfix}", 'w') as f:
             cells = self.__cc.get_cells_names()
             for i in range(0, len(self.attachment)):
                 if self.attachment[i] == {}:
@@ -50,10 +52,10 @@ class InferenceResult:
                         [cells[i], str(i), f"{int(self.attachment[i]['chr'])}_{self.attachment[i]['bin_start']}",
                          f"{int(self.attachment[i]['chr'])}_{self.attachment[i]['bin_end']}\n"]))
 
-        with open(dir + "inferred_snvs", 'w') as f:
+        with open(dir + f"inferred_snvs_{self.postfix}", 'w') as f:
             for s in self.inferred_snvs:
                 f.write(f"{s}\n")
-        numpy.savetxt(dir + "inferred_counts", X=self.get_inferred_copy_numbers(neutral_cn), delimiter=";")
+        numpy.savetxt(dir + f"inferred_counts_{self.postfix}", X=self.get_inferred_copy_numbers(neutral_cn), delimiter=";")
 
         def __node_to_str(node: Tuple[int, int]) -> str:
             if node == (0, 0):
@@ -61,7 +63,7 @@ class InferenceResult:
             chr = int(self.__cc.get_locus_chr(node[0]))
             return f"({chr}_{int(self.__cc.get_locus_bin_start(node[0]))},{chr}_{int(self.__cc.get_locus_bin_start(node[1]))})"
 
-        with open(dir + "inferred_tree", 'w') as f:
+        with open(dir + f"inferred_tree_{self.postfix}", 'w') as f:
             for edge in self.__tree.edges:
                 f.write(f"{__node_to_str(edge[0])}-{__node_to_str(edge[1])}\n")
 

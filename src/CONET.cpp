@@ -45,7 +45,7 @@ int main(int argc, char **argv) {
 		("use_snv_in_swap",  po::value<bool>()->default_value(false), "SNV penalty constant")
 		("snv_batch_size",  po::value<size_t>()->default_value(0))
 		("snv_burnin",  po::value<size_t>()->default_value(0))
-		("tries",  po::value<size_t>()->default_value(10))
+		("tries",  po::value<size_t>()->default_value(5))
 
 				;
 	po::variables_map vm;
