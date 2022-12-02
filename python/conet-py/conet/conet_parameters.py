@@ -24,6 +24,7 @@ class CONETParameters:
     use_snv_in_swap: bool = False
     snv_batch_size: int = 0
     snv_burnin: int = 0
+    tries: int = 0
 
     def to_arg_value_pairs(self) -> List[Tuple[str, str]]:
         return [(f"--{key}", f"{value}") for key, value in dataclasses.asdict(self).items()]

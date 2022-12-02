@@ -27,9 +27,7 @@ parser.add_argument('--output_dir', type=str, default='./')
 parser.add_argument('--end_bin_length', type=int, default=150000)
 parser.add_argument('--snv_constant', type=float, default=1.0)
 parser.add_argument('--add_chr_ends', type=bool, default=False)
-parser.add_argument('--use_snv_in_swap', type=bool, default=False)
-parser.add_argument('--snv_batch_size', type=int, default=0)
-parser.add_argument('--snv_burnin', type=int, default=0)
+parser.add_argument('--tries', type=int, default=1)
 
 args = parser.parse_args()
 
@@ -73,9 +71,7 @@ if __name__ == "__main__":
         neutral_cn=args.neutral_cn,
         output_dir=args.output_dir,
         snv_constant=args.snv_constant,
-        use_snv_in_swap=args.use_snv_in_swap,
-        snv_batch_size=args.snv_batch_size,
-        snv_burnin=args.snv_burnin
+        tries=args.tries
     )
     conet.infer_tree(params)
     result = InferenceResult(params.output_dir, cc)
