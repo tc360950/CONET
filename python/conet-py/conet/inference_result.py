@@ -20,7 +20,6 @@ class InferenceResult:
         self.__attachment = self.__load_attachment(output_path + "inferred_attachment_" + postfix)
         self.inferred_tree = self.__get_pretty_tree()
         self.attachment = self.__get_pretty_attachment()
-        self.inferred_snvs = self.__get_inferred_snvs(output_path + "inferred_snvs_" + postfix)
 
     def __get_inferred_snvs(self, path: str):
         def parse_line(line):
@@ -52,9 +51,6 @@ class InferenceResult:
                         [cells[i], str(i), f"{int(self.attachment[i]['chr'])}_{self.attachment[i]['bin_start']}",
                          f"{int(self.attachment[i]['chr'])}_{self.attachment[i]['bin_end']}\n"]))
 
-        with open(dir + f"inferred_snvs_{self.postfix}", 'w') as f:
-            for s in self.inferred_snvs:
-                f.write(f"{s}\n")
         numpy.savetxt(dir + f"inferred_counts_{self.postfix}", X=self.get_inferred_copy_numbers(neutral_cn), delimiter=";")
 
         def __node_to_str(node: Tuple[int, int]) -> str:

@@ -134,10 +134,12 @@ int main(int argc, char **argv) {
         size_t max_indx = 0;
 
         for (size_t j =0; j < results.size(); j++) {
+            std::cout << "Uwaga " << results[j].likelihood << " " << snv_likelihoods[j] << "\n";
+
             if (!max_set || results[j].likelihood + constant * snv_likelihoods[j] > max_score) {
                 max_set = true;
                 max_indx = j;
-                max_score = results[j].likelihood + constant * snv_likelihoods[j] > max_score;
+                max_score = results[j].likelihood + constant * snv_likelihoods[j];
             }
         }
 
