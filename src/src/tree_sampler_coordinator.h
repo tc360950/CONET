@@ -95,11 +95,13 @@ template <class Real_t> class TreeSamplerCoordinator {
         after_move_snv = temperature * after_move_snv;
     }
 
-
-    log_periodic("SNV likelihood after move ", after_move_snv, " CONET likelihood: ", 
+    if (best_found_tree.data.has_value())
+        log_periodic("SNV likelihood after move ", after_move_snv, " CONET likelihood: ",
       after_move_likelihood,
       " prior: ", after_prior, 
-      " penlty: ", after_move_counts_dispersion_penalty);
+      " penlty: ", after_move_counts_dispersion_penalty,
+      " best tree likelihood ",
+      best_found_tree.get().likelihood);
 
     after_move_likelihood = temperature * after_move_likelihood + after_prior + after_move_counts_dispersion_penalty + SNV_CONSTANT * after_move_snv;
 
