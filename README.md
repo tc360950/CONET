@@ -69,7 +69,7 @@ binary breakpoint indicator:
 0 -- otherwise
 
 ```bash
-Example of input matrix for SA501X3F xenograft breast cancer data is contained in CONET/python/notebooks/biological_data/data/SA501X3F_filtered_corrected_counts.csv
+Example of input matrix for SA501X3F xenograft breast cancer data is contained in CONET/python/scicone_on_conet/biological_data/data/SA501X3F_filtered_corrected_counts.csv
 and for TN2 breast cancer data -- in CONET/R/TN2_corrected_counts_with_indices_50cells.csv
 ```
 

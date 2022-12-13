@@ -24,8 +24,8 @@ WORKDIR conet-py
 RUN pip install .
 
 COPY python/notebooks notebooks
-RUN mkdir notebooks/biological_data/output
-RUN mkdir notebooks/per_bin_generative_model/output
+RUN mkdir scicone_on_conet/biological_data/output
+RUN mkdir scicone_on_conet/per_bin_generative_model/output
 
 COPY --from=0 /src/CONET .
 
