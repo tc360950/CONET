@@ -24,6 +24,7 @@
  * move rollback is carried out\n
  */
 template <class Real_t> class TreeSamplerCoordinator {
+public:
   using NodeHandle = EventTree::NodeHandle;
   using MoveData = typename MHStepsExecutor<Real_t>::MoveData;
   EventTree &tree;
@@ -33,6 +34,7 @@ template <class Real_t> class TreeSamplerCoordinator {
   std::map<MoveType, Real_t> move_probabilities;
   Real_t temperature{1.0};
   Real_t tree_count_dispersion_penalty{1.0}; // penalty value of a current tree
+  Real_t snv_likelihood;
   Utils::MaxValueAccumulator<CONETInferenceResult<Real_t>, Real_t>
       best_found_tree;
   MHStepsExecutor<Real_t> mh_step_executor;
@@ -59,12 +61,13 @@ template <class Real_t> class TreeSamplerCoordinator {
 
   void move(MoveType type) {
     Real_t snv_before = 0.0;
+    if (move_count == 0)
     {
         SNVSolver<Real_t> snv_solver(mh_step_executor.cells);
-        snv_before = snv_solver.insert_snv_events(move_count, tree, likelihood_coordinator.get_max_attachment(), SNVParams<Real_t>(P_E, P_M, P_Q));
-    }
-    if (USE_SNV_IN_SWAP) {
-        snv_before = temperature * snv_before;
+        snv_before = snv_solver.insert_snv_events(tree, likelihood_coordinator.get_max_attachment(), SNVParams<Real_t>(P_E, P_M, P_Q));
+        this->snv_likelihood = snv_before;
+    } else {
+        snv_before = this->snv_likelihood;
     }
     recalculate_counts_dispersion_penalty();
     auto before_move_likelihood =
@@ -89,12 +92,8 @@ template <class Real_t> class TreeSamplerCoordinator {
     Real_t after_move_snv = 0.0;
     {
         SNVSolver<Real_t> snv_solver(mh_step_executor.cells);
-        after_move_snv  = snv_solver.insert_snv_events(move_count, tree, max_attachment, SNVParams<Real_t>(P_E, P_M, P_Q));
+        after_move_snv  = snv_solver.insert_snv_events(tree, max_attachment, SNVParams<Real_t>(P_E, P_M, P_Q));
     }
-    if (USE_SNV_IN_SWAP) {
-        after_move_snv = temperature * after_move_snv;
-    }
-
     if (best_found_tree.data.has_value())
         log_periodic("SNV likelihood after move ", after_move_snv, " CONET likelihood: ",
       after_move_likelihood,
@@ -121,6 +120,7 @@ template <class Real_t> class TreeSamplerCoordinator {
       likelihood_coordinator.persist_likelihood_calculation_result();
       tree_count_dispersion_penalty = after_move_counts_dispersion_penalty;
       log_debug("Move accepted");
+      this->snv_likelihood = after_move_snv;
     } else {
       mh_step_executor.rollback_move(type, move_data);
       log_debug("Move rejected");
@@ -153,13 +153,7 @@ public:
                                                                  random} {}
 
   Real_t get_likelihood_without_priors_and_penalty() {
-    if (!USE_SNV_IN_SWAP) {
       return likelihood_coordinator.get_likelihood();
-    } else {
-      SNVSolver<Real_t> snv_solver(mh_step_executor.cells);
-      auto snv_before = snv_solver.insert_snv_events(tree, likelihood_coordinator.get_max_attachment(), SNVParams<Real_t>(P_E, P_M, P_Q));
-      return likelihood_coordinator.get_likelihood() + SNV_CONSTANT * snv_before;
-    }
   }
 
   void set_temperature(Real_t temperature) { this->temperature = temperature; }
@@ -172,7 +166,7 @@ public:
     auto snv_before = snv_solver.insert_snv_events(tree, likelihood_coordinator.get_max_attachment(), SNVParams<Real_t>(P_E, P_M, P_Q));
     return likelihood_coordinator.get_likelihood() +
            mh_step_executor.get_log_tree_prior() +
-           tree_count_dispersion_penalty + SNV_CONSTANT * snv_before;
+           tree_count_dispersion_penalty + SNV_CONSTANT * this->snv_likelihood;
   }
 
   Real_t get_temperature() const { return this->temperature; }

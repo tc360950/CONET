@@ -105,13 +105,14 @@ template <class Real_t> class ParallelTemperingCoordinator {
         map_parameters.brkp_likelihood.to_string());
     log("Estimated no-breakpoint distribution: ",
         map_parameters.no_brkp_likelihood.to_string());
-    SNV_CONSTANT = snv_likelihood_cont;
+   SNV_CONSTANT = snv_likelihood_cont;
     return map_parameters;
   }
 
   void mcmc_simulation(size_t iterations) {
-    auto snv_likelihood_const = SNV_CONSTANT;
-    SNV_CONSTANT = 0.0;
+    if (ESTIMATE_SNV_CONSTANT) {
+        SNV_CONSTANT = 0.0;
+    }
     for (size_t i = 0; i < iterations / NUMBER_OF_MOVES_BETWEEN_SWAPS; i++) {
       std::vector<std::thread> threads;
       for (size_t th = 0; th < NUM_REPLICAS; th++) {
@@ -125,7 +126,19 @@ template <class Real_t> class ParallelTemperingCoordinator {
         th.join();
       }
       swap_step();
+      if (i * NUMBER_OF_MOVES_BETWEEN_SWAPS > 0.2 * iterations && ESTIMATE_SNV_CONSTANT && SNV_CONSTANT == 0.0) {
+            auto lik = this->tree_sampling_coordinators[0]->get_total_likelihood();
+            SNVSolver<double> snv_solver(provider);
+            SNV_CONSTANT = 1.0;
+            auto at = likelihood_calculators[0]->get_max_attachment();
+            auto snv_before  = snv_solver.insert_snv_events(this->tree_sampling_coordinators[0]->tree, at, SNVParams<double>(P_E, P_M, P_Q), true);
 
+            SNV_CONSTANT = 0.01 * lik / snv_before;
+            for (size_t d = 0; d < 100; d++) {
+                log("ESTIMATED_SNV_CONST ", SNV_CONSTANT, " ", lik, " ", snv_before);
+            }
+
+      }
       if (VERBOSE && i % 1000 == 0) {
         log("State after ", i * NUMBER_OF_MOVES_BETWEEN_SWAPS, " iterations:");
         log("Tree size: ",
@@ -134,9 +147,6 @@ template <class Real_t> class ParallelTemperingCoordinator {
             this->likelihood_calculators[0]->get_likelihood());
         log("Log-likelihood with penalty: ",
             this->tree_sampling_coordinators[0]->get_total_likelihood());
-      }
-      if (i * NUMBER_OF_MOVES_BETWEEN_SWAPS > SNV_BURNIN) {
-        SNV_CONSTANT = snv_likelihood_const;
       }
     }
   }

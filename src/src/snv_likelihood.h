@@ -301,7 +301,7 @@ public:
             if (cn != 0 && cn_overlap) {
               LogWeightAccumulator<Real_t> acc; 
               for (size_t al = 0; al <= cn; al++) {
-                  auto prob = al == 0 ? p.e : (Real_t) al / (Real_t) cn; 
+                  auto prob = al == 0 ? p.e : (Real_t) al / (Real_t) cn;
                   prob = std::min(prob, 1.0 - p.e);
                   if (D[cell][snv] < B[cell][snv]) {
                     acc.add(
@@ -429,6 +429,10 @@ public:
       cn_calc.calculate_CN(tree, at);
       log_debug("Calculating CN matrix for snvs");
       fill_cn_matrix(cn_calc.CN_matrix);
+      log("B size", B.size(), " ", B[0].size());
+      log("D size", D.size(), " ", D[0].size());
+      log("CN size", CN_matrix.size(), " ", CN_matrix[0].size());
+
   }
 
   SNVLikelihood<Real_t>(CONETInputData<Real_t> &cells): cn_calc(cells) {
@@ -447,6 +451,8 @@ public:
     for (auto &el : CN_matrix) {
       el.resize(snvs.size());
     }
+
+
   }
 };
 
@@ -470,7 +476,10 @@ public:
         return result;
     }
 
-  Real_t insert_snv_events(EventTree& tree, Attachment& at, SNVParams<Real_t> p) {
+   Real_t insert_snv_events(EventTree& tree, Attachment& at, SNVParams<Real_t> p) {
+    return insert_snv_events(tree, at, p, false);
+   }
+  Real_t insert_snv_events(EventTree& tree, Attachment& at, SNVParams<Real_t> p, bool all) {
       if (SNV_CONSTANT == 0.0) {
         return 0.0;
       }
@@ -482,6 +491,9 @@ public:
       auto label_to_cell = at.get_node_label_to_cells_map();
 
       for (size_t snv = 0; snv < cells.snvs.size(); snv++) {
+        if (cells.snvs[snv].candidate == 0 && !all) {
+            continue;
+        }
         auto nodes = tree.get_descendants(tree.get_root());
         std::set<NodeHandle> nodes_{nodes.begin(), nodes.end()};
         nodes_.erase(tree.get_root());
@@ -512,62 +524,6 @@ public:
       }
       return likelihood.get_total_likelihood(p, tree, at, 0, cells.snvs.size());
   }
-
-  Real_t insert_snv_events(size_t move_count, EventTree& tree, Attachment& at, SNVParams<Real_t> p) {
-      if (SNV_CONSTANT == 0.0) {
-        return 0.0;
-      }
-      likelihood.init(tree, at);
-      
-      log_debug("Initialized snv likelihood calculator");
-
-      size_t snvs_batch = 0;
-      size_t batch_size = cells.snvs.size();
-
-      if (SNV_BATCH_SIZE > 0) {
-        size_t batches = cells.snvs.size() / SNV_BATCH_SIZE;
-        if (batches * SNV_BATCH_SIZE < cells.snvs.size()) {
-            batches++;
-        }
-        snvs_batch = (move_count % batches) * SNV_BATCH_SIZE;
-        batch_size = SNV_BATCH_SIZE;
-      }
-
-      auto label_to_node = map_label_to_node(tree);
-      auto label_to_cell = at.get_node_label_to_cells_map();
-
-      for (size_t snv = snvs_batch; snv < snvs_batch + batch_size && snv < cells.snvs.size(); snv++) {
-        auto nodes = tree.get_descendants(tree.get_root());
-        std::set<NodeHandle> nodes_{nodes.begin(), nodes.end()};
-        nodes_.erase(tree.get_root());
-        log_debug("Likelihood without snv for ", snv);
-        bool snv_added = false;
-        do {
-          snv_added = false;
-          auto lik_node = get_best_snv_location(tree, p, snv, nodes_, label_to_node, label_to_cell, at);
-          if (std::get<1>(lik_node) != nullptr) {
-               log_debug("Found better location for snv ", snv);
-              snv_added = true;
-              likelihood.node_to_snv[std::get<1>(lik_node)].insert(snv);
-              auto node = std::get<1>(lik_node);
-              auto parent = tree.get_parent(node);
-              while (parent != tree.get_root()) {
-                nodes_.erase(parent);
-                parent = tree.get_parent(parent);
-              }
-              log_debug("Deleting descendants");
-              for (auto desc: tree.get_descendants(std::get<1>(lik_node))) {
-                nodes_.erase(desc);
-              }
-              log_debug("Deleted descendants");
-          } else {
-            log_debug("Did not manage to find better location for snv ", snv);
-          }
-        } while(snv_added);
-      }
-      return likelihood.get_total_likelihood(p, tree, at, snvs_batch, snvs_batch + batch_size);
-  }
-
 
   std::pair<Real_t, NodeHandle> get_best_snv_location(EventTree& tree, SNVParams<Real_t> p, size_t snv, 
   std::set<NodeHandle> &nodes,std::map<TreeLabel, NodeHandle> &label_to_node, std::map<TreeLabel, std::set<size_t>> &label_to_cell,

@@ -20,7 +20,6 @@ extern double P_E;
 extern double P_M;
 extern double P_Q;
 extern double SNV_CONSTANT;
-extern bool USE_SNV_IN_SWAP;
-extern size_t SNV_BATCH_SIZE;
-extern size_t SNV_BURNIN;
+extern bool ESTIMATE_SNV_CONSTANT;
+
 #endif // !PARAMETERS_H

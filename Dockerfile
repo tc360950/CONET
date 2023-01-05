@@ -16,11 +16,16 @@ USER root
 RUN apt-get update && apt-get install -y python3-pip
 RUN pip install jupyterlab
 
-COPY python/conet-py/ conet-py/
-RUN pip install -r conet-py/requirements.txt
+RUN R -e "install.packages('BiocManager',dependencies=TRUE, repos='http://cran.rstudio.com/')"
+RUN R -e "BiocManager::install('DNAcopy')"
+RUN R -e "BiocManager::install('aCGH')"
+RUN R -e "install.packages('optparse',dependencies=TRUE, repos='http://cran.rstudio.com/')"
 
-WORKDIR conet-py
-RUN pip install .
+
+WORKDIR /code
+COPY python/conet-py/ ./conet-py/
+RUN pip install -r conet-py/requirements.txt
+RUN pip install ./conet-py
 
 COPY --from=0 /src/CONET ./notebooks/per_bin_generative_model/
 
@@ -35,4 +40,6 @@ RUN pip install pygraphviz
 COPY --from=0 /src/CONET ./
 
 COPY main.py main.py
-ENTRYPOINT ["python3", "main.py"]
+COPY CBS_MergeLevels.R ./
+#ENTRYPOINT ["python3", "main.py"]
+ENTRYPOINT ["sleep", "infinity"]

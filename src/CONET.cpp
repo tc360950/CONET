@@ -42,10 +42,8 @@ int main(int argc, char **argv) {
         ("m",  po::value<double>()->default_value(0.3), "Per allele coverage")
 		 ("q",  po::value<double>()->default_value(0.0001), "Read success probability")
         ("snv_constant",  po::value<double>()->default_value(1.0), "SNV penalty constant")
-		("use_snv_in_swap",  po::value<bool>()->default_value(false), "SNV penalty constant")
-		("snv_batch_size",  po::value<size_t>()->default_value(0))
-		("snv_burnin",  po::value<size_t>()->default_value(0))
 		("tries",  po::value<size_t>()->default_value(1))
+		("estimate_snv_constant",  po::value<bool>()->default_value(true))
 
 				;
 	po::variables_map vm;
@@ -60,9 +58,8 @@ int main(int argc, char **argv) {
 	auto param_inf_iters = vm["param_inf_iters"].as<int>();
 	auto pt_inf_iters = vm["pt_inf_iters"].as<int>();
 
-	USE_SNV_IN_SWAP = vm["use_snv_in_swap"].as<bool>();
-	SNV_BATCH_SIZE = vm["snv_batch_size"].as<size_t>();
-	SNV_BURNIN = vm["snv_burnin"].as<size_t>();
+    ESTIMATE_SNV_CONSTANT = vm["estimate_snv_constant"].as<bool>();
+
 	COUNTS_SCORE_CONSTANT_0 = vm["counts_penalty_s1"].as<double>();
 	COUNTS_SCORE_CONSTANT_1 = vm["counts_penalty_s2"].as<double>();
 	EVENTS_LENGTH_PENALTY = vm["event_length_penalty_k0"].as<double>();
@@ -88,7 +85,6 @@ int main(int argc, char **argv) {
 
     CONETInputData<double> provider = create_from_file(string(data_dir).append("ratios"), string(data_dir).append("counts"), string(data_dir).append("counts_squared"), ';');
 
-    log("SNV batch size: ", SNV_BATCH_SIZE);
     log("Loading data for SNV extension...");
     auto B = string_matrix_to_int(split_file_by_delimiter(string(data_dir).append("B"), ';'));
     log("Loaded matrix of alternative reads with ", B.size(), " rows and ", B[0].size(), " columns");
@@ -107,21 +103,17 @@ int main(int argc, char **argv) {
         provider.cluster_sizes.push_back(el[0]);
     }
     for (size_t i = 0; i < snvs.size(); i++) {
-        provider.snvs.push_back(SNVEvent(i, snvs[i][1]));
+        provider.snvs.push_back(SNVEvent(i, snvs[i][1], snvs[i][2]));
     }
 
     for (size_t i = 0; i < TRIES; i++)
     {
+        SNV_CONSTANT = snv_constant_backup;
         log("Starting try ", i + 1);
-        SNV_CONSTANT = 0.0;
         ParallelTemperingCoordinator<double> PT(provider, random);
         CONETInferenceResult<double> result = PT.simulate(param_inf_iters, pt_inf_iters);
         log("Tree inference has finished");
         results.push_back(result);
-        SNVSolver<double> snv_solver(provider);
-        SNV_CONSTANT = 1.0;
-        auto snv_lik = snv_solver.insert_snv_events(result.tree, result.attachment, SNVParams<double>(P_E, P_M, P_Q));
-        snv_likelihoods.push_back(snv_lik);
         std::cout << "Finished CONSET try " << i + 1 << "\n";
     }
     SNV_CONSTANT = 1.0;
@@ -129,12 +121,14 @@ int main(int argc, char **argv) {
     double max = 0.0;
     size_t max_idx = 0;
     for (size_t i = 0; i < results.size(); i++) {
-        if (!max_set || results[i].likelihood + snv_constant_backup * snv_likelihoods[i] > max) {
+        if (!max_set || results[i].likelihood > max) {
             max_set = true;
-            max = results[i].likelihood + snv_constant_backup * snv_likelihoods[i];
+            max = results[i].likelihood;
             max_idx = i;
         }
     }
+
+    log("Max likelihood ", max);
 
     std::ofstream tree_file{ string(output_dir).append("inferred_tree") };
     tree_file << TreeFormatter::to_string_representation(results[max_idx].tree);
@@ -143,8 +137,8 @@ int main(int argc, char **argv) {
 
 
     SNVSolver<double> snv_solver(provider);
-    SNV_CONSTANT = snv_constant_backup;
-    auto snv_before  = snv_solver.insert_snv_events(results[max_idx].tree, results[max_idx].attachment, SNVParams<double>(P_E, P_M, P_Q));
+    SNV_CONSTANT = 1.0;
+    auto snv_before  = snv_solver.insert_snv_events(results[max_idx].tree, results[max_idx].attachment, SNVParams<double>(P_E, P_M, P_Q), true);
 
     std::cout << "\nSNV likelihood: " << snv_before;
 	std::ofstream snv_file{ string(output_dir).append("inferred_snvs") };

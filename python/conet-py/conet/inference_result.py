@@ -46,7 +46,7 @@ class InferenceResult:
             cells = self.__cc.get_cells_names()
             for i in range(0, len(self.attachment)):
                 if self.attachment[i] == {}:
-                    f.write(";".join([cells[i], str(i), "(0,0)"]))
+                    f.write(";".join([cells[i], str(i), "0;0\n"]))
                 else:
                     f.write(";".join(
                         [cells[i], str(i), f"{int(self.attachment[i]['chr'])}_{self.attachment[i]['bin_start']}",
