@@ -12,55 +12,6 @@
 
 #include <boost/math/distributions/negative_binomial.hpp>
 #include <boost/math/distributions/binomial.hpp>
-template <class Real_t> class NegBinomCalc {
-
-static NegBinomCalc<Real_t>* singleton;
-
-public: 
-  std::vector<Real_t> cache_;
-
-  NegBinomCalc<Real_t> () {
-    cache_.resize(10000000);
-    cache_[0] = std::log(1);
-    for (size_t i = 1; i < 10000000; i++) {
-      cache_[i] = cache_[i-1] + std::log((Real_t) i);
-    }
-  }
-
-  static NegBinomCalc<Real_t> *GetInstance();
-
-   Real_t log_factorial(size_t n) {
-    if (n < cache_.size()) {
-      return cache_[n];
-    }
-    log("Cache miss ", n);
-    Real_t result = cache_.back(); 
-    for (size_t i = cache_.size(); i <= n; i++) {
-      result += std::log( (Real_t) i);
-    }
-    return result;
-  }
-  Real_t get(size_t num_failures,  Real_t prob, size_t d) {
-      Real_t result = num_failures * std::log(prob) + d * std::log(1.0 - prob);
-      return result + log_factorial(num_failures + d - 1) - log_factorial(num_failures - 1) - log_factorial(d);
-  }
-};
-
-template<class Real_t> NegBinomCalc<Real_t> * NegBinomCalc<Real_t>::singleton= nullptr;
-/**
- * Static methods should be defined outside the class.
- */
-template<class Real_t> NegBinomCalc<Real_t> *NegBinomCalc<Real_t>::GetInstance()
-{
-    /**
-     * This is a safer way to create an instance. instance = new Singleton is
-     * dangeruous in case two instance threads wants to access at the same time
-     */
-    if(singleton==nullptr){
-        singleton = new NegBinomCalc<Real_t>();
-    }
-    return singleton;
-}
 
 template < class Real_t> class CNMatrixCalculator {
 public: 
@@ -94,41 +45,39 @@ public:
      /**
    * @brief Move all cells attached to @child to @parent
    */
-  void move_cells_to_parent(EventTree::NodeHandle child, EventTree::NodeHandle parent, std::map<TreeLabel, std::set<size_t>> &attachment) {
-    if (attachment.find(child->label) == attachment.end()) {
-      return;
-    }
-    if (attachment.find(parent->label) == attachment.end()) {
-      attachment[parent->label] = std::set<size_t>();
-    }
-    attachment[parent->label].insert(attachment[child->label].begin(), attachment[child->label].end());
-    attachment.erase(child->label);
+  void move_cells_to_parent(EventTree::NodeHandle child, EventTree::NodeHandle parent, std::vector<TreeLabel> &attachment) {
+        for (size_t c = 0; c < CN_matrix.size(); c++) {
+            if (attachment[c] == child->label) {
+                attachment[c] = parent->label;
+            }
+        }
   }
 
-  void calculate_CN_for_bins_at_node(EventTree::NodeHandle node, std::map<TreeLabel, std::set<size_t>> &attachment) {
-    if (attachment.find(node->label) == attachment.end()) {
-      return;
-    }
+  void calculate_CN_for_bins_at_node(EventTree::NodeHandle node, std::vector<TreeLabel> &attachment) {
     std::map<size_t, Real_t> cluster_to_counts_sum;
     std::map<size_t, Real_t> cluster_to_bin_count;
     std::map<size_t, Real_t> cluster_to_squared_counts_sum;
     std::map<size_t, int> cluster_to_CN;
 
     auto event = get_event_from_label(node->label);
+
     for (size_t i = event.first; i < event.second; i++) {
       cluster_to_counts_sum[event_clusters[i]] = 0.0;
       cluster_to_bin_count[event_clusters[i]] = 0.0;
       cluster_to_squared_counts_sum[event_clusters[i]] = 0.0;
     }
 
-    for (auto cell : attachment[node->label]) {
-      for (size_t bin = event.first; bin < event.second; bin++) {
-        if (CN_matrix[cell][bin] < 0) {
-          cluster_to_counts_sum[event_clusters[bin]] += sum_counts[cell][bin];
-          cluster_to_squared_counts_sum[event_clusters[bin]] += squared_counts[cell][bin];
-          cluster_to_bin_count[event_clusters[bin]] += counts_score_length_of_bin[bin];
+    for (size_t c = 0; c < CN_matrix.size(); c++) {
+        if (attachment[c] != node->label) {
+            continue;
         }
-      }
+        for (size_t bin = event.first; bin < event.second; bin++) {
+            if (CN_matrix[c][bin] < 0) {
+              cluster_to_counts_sum[event_clusters[bin]] += sum_counts[c][bin];
+              cluster_to_squared_counts_sum[event_clusters[bin]] += squared_counts[c][bin];
+              cluster_to_bin_count[event_clusters[bin]] += counts_score_length_of_bin[bin];
+            }
+        }
     }
 
     for (const auto &cluster : cluster_to_counts_sum) {
@@ -138,10 +87,10 @@ public:
       }
     }
 
-    for (auto cell : attachment[node->label]) {
+    for (size_t c = 0; c < CN_matrix.size(); c++) {
       for (size_t bin = event.first; bin < event.second; bin++) {
-        if (CN_matrix[cell][bin] < 0) {
-            CN_matrix[cell][bin] = cluster_to_CN[event_clusters[bin]];
+        if (CN_matrix[c][bin] < 0) {
+            CN_matrix[c][bin] = cluster_to_CN[event_clusters[bin]];
         }
       }
     }
@@ -159,7 +108,7 @@ public:
     }
   }
 
-  void _calculate_CN(EventTree::NodeHandle node, std::map<TreeLabel, std::set<size_t>> &attachment) {
+  void _calculate_CN(EventTree::NodeHandle node, std::vector<TreeLabel> &attachment) {
     auto node_cache_id = cache_id;
     cache_id++;
 
@@ -190,7 +139,7 @@ public:
 
 void calculate_CN(EventTree &tree, Attachment &at) {
     init_state();
-    std::map<TreeLabel, std::set<size_t>> attachment = at.get_node_label_to_cells_map();
+    std::vector<TreeLabel> attachment = at.cell_to_tree_label;
     for (auto node : tree.get_children(tree.get_root())) {
       _calculate_CN(node, attachment);
     }
@@ -211,7 +160,7 @@ CNMatrixCalculator<Real_t>(CONETInputData<Real_t> &cells)
 
     CN_matrix.resize(cells.get_cells_count());
     for (auto &b : CN_matrix) {
-      b.resize(cells.snvs.size());
+      b.resize(cells.get_loci_count());
     }
     clusters_cache.resize(DEFAULT_CACHE_SIZE);
   }
@@ -252,6 +201,8 @@ public:
 
     std::vector<std::vector<int>> B;
     std::vector<std::vector<int>> D;
+    std::vector<std::vector<Real_t>> Alpha;
+    std::vector<std::vector<Real_t>> Beta;
     std::vector<std::vector<Real_t>> B_log_lik;
     std::vector<std::vector<Real_t>> D_log_lik;
 
@@ -259,24 +210,19 @@ public:
 
     std::map<NodeHandle, std::set<size_t>> node_to_snv; 
 
+
     void calculate_d_lik(SNVParams<Real_t> &p, size_t start, size_t end) {
+      auto coef = std::exp(std::log(1 -p.q) - std::log(p.q));
       for (size_t cell = 0; cell < D_log_lik.size(); cell++) {
         for (size_t snv = start; snv < end; snv++) {
-            auto d = D[cell][snv];
-            auto cn = CN_matrix[cell][snv];
-            auto cluster_size = cluster_sizes[cell];
-
-            Real_t mean = cn == 0 ? (cluster_size * p.e) : (cluster_size * p.m * cn);
-            int num_failures = std::round(
-              std::exp(
-                std::log1p(-p.q) + std::log(mean) - std::log(p.q)
-              )
-            );
-            
-            //D_log_lik[cell][snv] = num_failures == 0 ? 0.0 : std::log(pdf(negative_binomial(num_failures, 1-p.q), d));
-            D_log_lik[cell][snv] = num_failures == 0 ? 0.0 : NegBinomCalc<Real_t>::GetInstance()->get(num_failures, 1.0 - p.q, d);
+                Alpha[cell][ snv] = cluster_sizes[cell] * p.e + cluster_sizes[cell] * CN_matrix[cell][snv] * p.m;
+                Beta[cell][snv] = 0.0;
+                for (size_t i =0; i < D[cell][snv]; i++) {
+                   Beta[cell][snv] += std::log(Alpha[cell][snv] * coef + i);
+                }
+                D_log_lik[cell][snv] = coef * std::log(1 -p.q) * Alpha[cell][ snv]  + std::log(p.q) * D[cell][snv] + Beta[cell][snv];
         }
-      }
+       }
     }
 
     std::map<TreeLabel, NodeHandle> map_label_to_node(EventTree &tree) {
@@ -429,9 +375,9 @@ public:
       cn_calc.calculate_CN(tree, at);
       log_debug("Calculating CN matrix for snvs");
       fill_cn_matrix(cn_calc.CN_matrix);
-      log("B size", B.size(), " ", B[0].size());
-      log("D size", D.size(), " ", D[0].size());
-      log("CN size", CN_matrix.size(), " ", CN_matrix[0].size());
+      log_debug("B size", B.size(), " ", B[0].size());
+      log_debug("D size", D.size(), " ", D[0].size());
+      log_debug("CN size", CN_matrix.size(), " ", CN_matrix[0].size());
 
   }
 
@@ -443,16 +389,16 @@ public:
     D = cells.D;
     B_log_lik.resize(cells.get_cells_count());
     D_log_lik.resize(cells.get_cells_count());
+    Alpha.resize(cells.get_cells_count());
+    Beta.resize(cells.get_cells_count());
 
     for (size_t i = 0; i < cells.get_cells_count(); i++) {
         B_log_lik[i].resize(snvs.size());
         D_log_lik[i].resize(snvs.size());
+        Alpha[i].resize(snvs.size());
+        Beta[i].resize(snvs.size());
+        CN_matrix[i].resize(snvs.size());
     }
-    for (auto &el : CN_matrix) {
-      el.resize(snvs.size());
-    }
-
-
   }
 };
 
@@ -486,10 +432,8 @@ public:
       likelihood.init(tree, at);
 
       log_debug("Initialized snv likelihood calculator");
-
       auto label_to_node = map_label_to_node(tree);
       auto label_to_cell = at.get_node_label_to_cells_map();
-
       for (size_t snv = 0; snv < cells.snvs.size(); snv++) {
         if (cells.snvs[snv].candidate == 0 && !all) {
             continue;
@@ -536,9 +480,7 @@ public:
           if (likelihood.node_to_snv.count(n) == 0) {
             likelihood.node_to_snv[n] = std::set<size_t>();
           }
-          // likelihood.node_to_snv[n].insert(snv);
           auto lik = likelihood.calculate_b_lik_for_SN_acquire2(n, p, tree, snv, at, false, label_to_cell);
-          // likelihood.node_to_snv[n].erase(snv);
           if (lik > max_lik) {
             max_set = true;
             max_lik = lik;

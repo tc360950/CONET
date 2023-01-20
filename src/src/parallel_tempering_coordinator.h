@@ -133,7 +133,7 @@ template <class Real_t> class ParallelTemperingCoordinator {
             auto at = likelihood_calculators[0]->get_max_attachment();
             auto snv_before  = snv_solver.insert_snv_events(this->tree_sampling_coordinators[0]->tree, at, SNVParams<double>(P_E, P_M, P_Q), true);
 
-            SNV_CONSTANT = 0.01 * lik / snv_before;
+            SNV_CONSTANT = 0.01 * std::abs(lik) / std::abs(snv_before);
             for (size_t d = 0; d < 100; d++) {
                 log("ESTIMATED_SNV_CONST ", SNV_CONSTANT, " ", lik, " ", snv_before);
             }

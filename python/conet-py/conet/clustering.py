@@ -17,8 +17,9 @@ def find_clustering(D: np.ndarray, cn: np.ndarray,  min_coverage: float) -> List
         cn = cn.astype(int)
         coverage = np.mean(D)
         cell_to_cluster = {cell: clustering[old_c] for cell, old_c in cell_to_cluster.items()}
+        print(f"Coverage {coverage} clusters {len(set(cell_to_cluster.values()))}")
 
-    print(f"Cluster generation complete with {len(set(cell_to_cluster))} clusters.")
+    print(f"Cluster generation complete with {len(set(cell_to_cluster.values()))} clusters.")
     res = [(cell, c) for cell, c in cell_to_cluster.items()]
     res.sort()
     return [r[1] for r in res]

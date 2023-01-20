@@ -9,12 +9,12 @@ import shutil
 from conet.data_converter.corrected_counts import CorrectedCounts
 from conet.data_converter.data_converter import DataConverter
 from conet import CONET, CONETParameters, InferenceResult
-from conet.snv_inference import MMEstimator, NewtonRhapsonEstimator, NewtonRhapsonEstimatorOnlyQ
+from conet.snv_inference import MMEstimator, NewtonRhapsonEstimator
 from conet.clustering import find_clustering, cluster_array
 
 parser = argparse.ArgumentParser(description='Run CONET')
 parser.add_argument('--data_dir', type=str, default='/data')
-parser.add_argument('--param_inf_iters', type=int, default=100000)
+parser.add_argument('--param_inf_iters', type=int, default=30000)
 parser.add_argument('--pt_inf_iters', type=int, default=100000)
 parser.add_argument('--counts_penalty_s1', type=float, default=0.0)
 parser.add_argument('--counts_penalty_s2', type=float, default=0.0)
@@ -32,61 +32,72 @@ parser.add_argument('--end_bin_length', type=int, default=150000)
 parser.add_argument('--snv_constant', type=float, default=1.0)
 parser.add_argument('--add_chr_ends', type=bool, default=False)
 parser.add_argument('--tries', type=int, default=1)
-parser.add_argument('--snv_candidates', type=int, default=10)
+parser.add_argument('--snv_candidates', type=int, default=40)
 parser.add_argument('--cbs_min_cells', type=int, default=1)
 parser.add_argument('--estimate_snv_constant', type=bool, default=False)
-parser.add_argument('--min_coverage', type=float, default=10)
-parser.add_argument('--cluster', type=bool, default=False)
+parser.add_argument('--min_coverage', type=float, default=5)
 parser.add_argument('--dont_infer_breakpoints', type=bool, default=False)
 parser.add_argument('--default_sequencing_error', type=float, default=0.00001)
-parser.add_argument('--nr_only_q', type=bool, default=True)
 args = parser.parse_args()
 
 if __name__ == "__main__":
 
-    p = (Path(args.data_dir) / Path("tmp/")).mkdir(parents=False, exist_ok=True)
+    (Path(args.data_dir) / Path("tmp/")).mkdir(parents=False, exist_ok=True)
     data_dir = str(Path(args.data_dir) / Path("tmp/"))
     shutil.copyfile(Path(args.data_dir) / Path("snvs_data"), Path(data_dir) / Path("snvs_data"))
-    if (Path(args.data_dir) / Path("cluster_sizes")).exists():
-        shutil.copyfile(Path(args.data_dir) / Path("cluster_sizes"), Path(data_dir) / Path("cluster_sizes"))
     shutil.copyfile(Path(args.data_dir) / Path("D"), Path(data_dir) / Path("D"))
     shutil.copyfile(Path(args.data_dir) / Path("B"), Path(data_dir) / Path("B"))
     shutil.copyfile(Path(args.data_dir) / Path("cc"), Path(data_dir) / Path("cc"))
 
-    print("Inferring breakpoints...")
+    print("Inferring CN profiles using CBS+MergeLevels...")
     corrected_counts: pd.DataFrame = pd.read_csv(Path(data_dir) / Path("cc"))
-    x = subprocess.run(["Rscript", "CBS_MergeLevels.R", f"--mincells={args.cbs_min_cells}",
-                        f"--output=./cc_with_candidates", f"--cn_output=./cn_cbs",
-                        f"--dataset={Path(data_dir) / Path('cc')}"])
+    if (Path(data_dir) / Path('cc_with_candidates')).exists() and (Path(data_dir) / Path('cn_cbs')).exists():
+        print("CBS+MegeLevels output files found in output directory, skipping inference...")
+    else:
+        x = subprocess.run(["Rscript", "CBS_MergeLevels.R", f"--mincells={args.cbs_min_cells}",
+                            f"--output={Path(data_dir) / Path('cc_with_candidates')}",
+                            f"--cn_output={Path(data_dir) / Path('cn_cbs')}",
+                            f"--dataset={Path(data_dir) / Path('cc')}"])
 
-    if x.returncode != 0:
-        raise RuntimeError("Breakpoint inference failed")
+        if x.returncode != 0:
+            raise RuntimeError("Breakpoint inference failed")
 
-    cn = pd.read_csv("./cn_cbs", header=None)
+    cn = pd.read_csv(Path(data_dir)/ Path('cn_cbs'), header=None)
     if args.dont_infer_breakpoints:
         cc_with_candidates = pd.read_csv(Path(data_dir) / Path("cc"), sep=",")
     else:
-        cc_with_candidates = pd.read_csv("./cc_with_candidates")
+        cc_with_candidates = pd.read_csv(Path(data_dir)/ Path('cc_with_candidates'))
         print("Breakpoint inference finished")
         print(f"Found {np.sum(cc_with_candidates.candidate_brkp)} breakpoints")
+
     cn = np.array(cn).T
     D = np.loadtxt(Path(data_dir) / Path("D"), delimiter=";")
     B = np.loadtxt(Path(data_dir) / Path("B"), delimiter=";")
+    cluster_sizes = [1 for _ in range(cc_with_candidates.shape[1] - 5)]
 
-    if args.cluster:
-        print("Clustering cells...")
-        clustering = find_clustering(D, cn, args.min_coverage)
-        D= cluster_array(D, clustering, function="sum")
-        B= cluster_array(B, clustering, function="sum")
-        np.savetxt(Path(data_dir) / Path("D"), D, delimiter=";")
-        np.savetxt(Path(data_dir) / Path("B"), B, delimiter=";")
-        cn = cluster_array(cn, clustering, function ="median")
-        cn = cn.astype(int)
-        with open(Path(data_dir) / Path("cluster_sizes"), "w") as f:
-            clusters = list(set(clustering))
-            clusters.sort()
-            for c in clusters:
-                f.write(f"{len([x for x in clustering if x == c])}\n")
+    print("Clustering cells...")
+    clustering = find_clustering(D, cn, args.min_coverage)
+    D= cluster_array(D, clustering, function="sum")
+    B= cluster_array(B, clustering, function="sum")
+    np.savetxt(Path(data_dir) / Path("D"), D, delimiter=";")
+    np.savetxt(Path(data_dir) / Path("B"), B, delimiter=";")
+    cn = cluster_array(cn, clustering, function ="median")
+    cn = cn.astype(int)
+    with open(Path(data_dir) / Path("cluster_sizes"), "w") as f:
+        clusters = list(set(clustering))
+        clusters.sort()
+        for c in clusters:
+            f.write(f"{sum([cluster_sizes[i] for i, x in enumerate(clustering) if x == c])}\n")
+    with open(Path(args.output_dir) / Path("cell_to_cluster"), "w") as f:
+        for i, c in enumerate(clustering):
+            f.write(f"{cc_with_candidates.columns[i +5]};cluster_{c}\n")
+
+    cc_ = np.array(cc_with_candidates.iloc[:, 5:]).T
+    cc_ = cluster_array(cc_, clustering, function="median").T
+    cc_with_candidates = cc_with_candidates.iloc[:,:5]
+    for c in range(0, len(set(clustering))):
+        cc_with_candidates[f"cluster_{c}"] = cc_[:,c]
+
 
 
     print("Inferring SNV likelihood parameters...")
@@ -104,11 +115,13 @@ if __name__ == "__main__":
     params = MMEstimator.estimate(D, cn_for_snvs, cluster_sizes)
     print(f"Estimated params: {params}")
     print("Running newton-Rhapson estimator...")
-    if args.nr_only_q:
-        params = NewtonRhapsonEstimatorOnlyQ(D, cn_for_snvs, cluster_sizes).solve(params)
-    else:
-        params = NewtonRhapsonEstimator(D, cn_for_snvs, cluster_sizes).solve(params)
+    params = NewtonRhapsonEstimator(D, cn_for_snvs, cluster_sizes).solve(params)
+    if params.e <= 0.0:
+        params.e = MMEstimator.DEFAULT_SEQUENCING_ERROR
     print(f"Estimated params: {params}")
+
+    with open(Path(args.output_dir) / Path("SNV_params"), "w") as f:
+        f.write(f"Estimated params: {params}")
 
     signals = list(np.mean(B, axis=0))
     signals = [(i, s) for i, s in enumerate(signals) if snvs_data[i, 2] == 1.0]

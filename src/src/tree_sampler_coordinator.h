@@ -61,14 +61,9 @@ public:
 
   void move(MoveType type) {
     Real_t snv_before = 0.0;
-    if (move_count == 0)
-    {
-        SNVSolver<Real_t> snv_solver(mh_step_executor.cells);
-        snv_before = snv_solver.insert_snv_events(tree, likelihood_coordinator.get_max_attachment(), SNVParams<Real_t>(P_E, P_M, P_Q));
-        this->snv_likelihood = snv_before;
-    } else {
-        snv_before = this->snv_likelihood;
-    }
+    SNVSolver<Real_t> snv_solver(mh_step_executor.cells);
+    snv_before = snv_solver.insert_snv_events(tree, likelihood_coordinator.get_max_attachment(), SNVParams<Real_t>(P_E, P_M, P_Q));
+    this->snv_likelihood = snv_before;
     recalculate_counts_dispersion_penalty();
     auto before_move_likelihood =
         temperature * likelihood_coordinator.get_likelihood() +

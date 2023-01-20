@@ -36,10 +36,12 @@ RUN pip install matplotlib
 RUN apt-get update
 RUN apt-get install graphviz libgraphviz-dev pkg-config
 RUN pip install pygraphviz
-
+RUN apt install gdb
 COPY --from=0 /src/CONET ./
 
-COPY main.py main.py
+COPY unclustered.py unclustered.py
+COPY clustered.py clustered.py
 COPY CBS_MergeLevels.R ./
-#ENTRYPOINT ["python3", "main.py"]
-ENTRYPOINT ["sleep", "infinity"]
+COPY src ./src
+ENTRYPOINT ["python3"]
+#ENTRYPOINT ["sleep", "infinity"]
