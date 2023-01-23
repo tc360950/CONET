@@ -35,7 +35,7 @@ parser.add_argument('--snv_candidates', type=int, default=10)
 parser.add_argument('--cbs_min_cells', type=int, default=1)
 parser.add_argument('--estimate_snv_constant', type=bool, default=False)
 parser.add_argument('--dont_infer_breakpoints', type=bool, default=False)
-parser.add_argument('--default_sequencing_error', type=float, default=0.00001)
+parser.add_argument('--sequencing_error', type=float, default=0.00001)
 args = parser.parse_args()
 
 if __name__ == "__main__":
@@ -81,14 +81,13 @@ if __name__ == "__main__":
             if snvs_data[snv, 1] >= 0:
                 cn_for_snvs[cell, snv] = cn[cell, snvs_data[snv, 1]]
 
-    print(f"Running MM estimator with default sequencing error {args.default_sequencing_error}")
-    MMEstimator.DEFAULT_SEQUENCING_ERROR = args.default_sequencing_error
+    print(f"Running MM estimator with sequencing error {args.sequencing_error}")
+    MMEstimator.DEFAULT_SEQUENCING_ERROR = args.sequencing_error
     params = MMEstimator.estimate(D, cn_for_snvs, cluster_sizes)
+    params.e = args.sequencing_error
     print(f"Estimated params: {params}")
     print("Running newton-Rhapson estimator...")
     params = NewtonRhapsonEstimator(D, cn_for_snvs, cluster_sizes).solve(params)
-    if params.e <= 0.0:
-        params.e = MMEstimator.DEFAULT_SEQUENCING_ERROR
     print(f"Estimated params: {params}")
 
     with open(Path(args.output_dir) / Path("SNV_params"), "w") as f:
