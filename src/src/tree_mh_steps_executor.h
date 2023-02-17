@@ -321,12 +321,13 @@ public:
   }
 
   Real_t get_log_tree_prior() {
+    auto all_cells = std::reduce(cells.cluster_sizes.begin(), cells.cluster_sizes.end());
     const Real_t C = std::log((Real_t)tree.get_size()) -
                      label_sampler.get_sample_label_log_kernel() +
                      node_sampler.get_delete_leaf_kernel();
     return -C * (Real_t)tree.get_size() -
            EVENTS_LENGTH_PENALTY * get_total_events_length() -
-           DATA_SIZE_PRIOR_CONSTANT * ((Real_t)cells.get_cells_count()) *
+           DATA_SIZE_PRIOR_CONSTANT * ((Real_t)all_cells) *
                tree.get_size();
   }
 };

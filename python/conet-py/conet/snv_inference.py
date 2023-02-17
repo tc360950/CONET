@@ -90,23 +90,16 @@ class NewtonRhapsonEstimator:
 
         i2 = 0
         target = self.calculate_target(params)
-        while np.max(np.abs(target)) >= 0.1 and i2 < 10000:
+        while np.max(np.abs(target[1:])) >= 0.1 and i2 < 10000:
             target = self.calculate_target(params)
             print(f"Target after {i2} iterations {target} with {params}")
-            jacobian = self.calculate_jacobian(params)
-            if np.sum(self.S_0) == 0.0:
-                inverse_sub_jacobian = np.linalg.inv(jacobian[1:3, 1:3])
-                inverse_jacobian = np.zeros((3, 3))
-                inverse_jacobian[1:3, 1:3] = inverse_sub_jacobian
-            else:
-                inverse_jacobian = np.linalg.inv(self.calculate_jacobian(params))
-            diff_vec = np.matmul(inverse_jacobian, target)
+            inverse_jacobian = np.linalg.inv(self.calculate_jacobian(params))
+            diff_vec = np.matmul(inverse_jacobian, target[1:])
 
             for i in range(0, diff_vec.shape[0]):
-                if p_vec[i] - diff_vec[i] < 0:
-                    diff_vec[i] = 0.7 * p_vec[i]
-            p_vec = p_vec - diff_vec
-            params.e = p_vec[0]
+                if p_vec[i + 1] - diff_vec[i] < 0:
+                    diff_vec[i] = 0.7 * p_vec[i + 1]
+                p_vec[i + 1] -= diff_vec[i]
             params.m = p_vec[1]
             params.q = p_vec[2]
             params.q = min(params.q, NewtonRhapsonEstimator.MAX_Q)
@@ -242,6 +235,9 @@ class NewtonRhapsonEstimator:
         f_3_m = f_2_q
         f_3_e = f_1_q
 
+        # return np.array(
+        #     [[f_1_e, f_1_m, f_1_q], [f_2_e, f_2_m, f_2_q], [f_3_e, f_3_m, f_3_q]]
+        # )
         return np.array(
-            [[f_1_e, f_1_m, f_1_q], [f_2_e, f_2_m, f_2_q], [f_3_e, f_3_m, f_3_q]]
+            [[f_2_m, f_2_q], [f_3_m, f_3_q]]
         )

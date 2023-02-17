@@ -19,8 +19,8 @@ parser.add_argument('--pt_inf_iters', type=int, default=100000)
 parser.add_argument('--counts_penalty_s1', type=float, default=0.0)
 parser.add_argument('--counts_penalty_s2', type=float, default=0.0)
 parser.add_argument('--event_length_penalty_k0', type=float, default=1.0)
-parser.add_argument('--tree_structure_prior_k1', type=float, default=1.0)
-parser.add_argument('--use_event_lengths_in_attachment', type=bool, default=True)
+parser.add_argument('--tree_structure_prior_k1', type=float, default=0.0)
+parser.add_argument('--use_event_lengths_in_attachment', type=bool, default=False)
 parser.add_argument('--seed', type=int, default=12312)
 parser.add_argument('--mixture_size', type=int, default=4)
 parser.add_argument('--num_replicas', type=int, default=5)
@@ -36,8 +36,10 @@ parser.add_argument('--snv_candidates', type=int, default=40)
 parser.add_argument('--cbs_min_cells', type=int, default=1)
 parser.add_argument('--estimate_snv_constant', type=bool, default=False)
 parser.add_argument('--min_coverage', type=float, default=5)
+parser.add_argument('--max_coverage', type=float, default=12.5)
 parser.add_argument('--dont_infer_breakpoints', type=bool, default=False)
 parser.add_argument('--sequencing_error', type=float, default=0.00001)
+parser.add_argument('--recalculate_cbs', type=bool, default=False)
 args = parser.parse_args()
 
 if __name__ == "__main__":
@@ -51,7 +53,7 @@ if __name__ == "__main__":
 
     print("Inferring CN profiles using CBS+MergeLevels...")
     corrected_counts: pd.DataFrame = pd.read_csv(Path(data_dir) / Path("cc"))
-    if (Path(data_dir) / Path('cc_with_candidates')).exists() and (Path(data_dir) / Path('cn_cbs')).exists():
+    if not args.recalculate_cbs:
         print("CBS+MegeLevels output files found in output directory, skipping inference...")
     else:
         x = subprocess.run(["Rscript", "CBS_MergeLevels.R", f"--mincells={args.cbs_min_cells}",
@@ -76,13 +78,13 @@ if __name__ == "__main__":
     cluster_sizes = [1 for _ in range(cc_with_candidates.shape[1] - 5)]
 
     print("Clustering cells...")
-    clustering = find_clustering(D, cn, args.min_coverage)
+    clustering = find_clustering(D, cn, args.min_coverage, args.max_coverage)
     D= cluster_array(D, clustering, function="sum")
     B= cluster_array(B, clustering, function="sum")
     np.savetxt(Path(data_dir) / Path("D"), D, delimiter=";")
     np.savetxt(Path(data_dir) / Path("B"), B, delimiter=";")
-    cn = cluster_array(cn, clustering, function ="median")
-    cn = cn.astype(int)
+    # cn = cluster_array(cn, clustering, function ="median")
+    # cn = cn.astype(int)
     with open(Path(data_dir) / Path("cluster_sizes"), "w") as f:
         clusters = list(set(clustering))
         clusters.sort()
@@ -180,10 +182,8 @@ if __name__ == "__main__":
         q=params.q
     )
     conet.infer_tree(params)
-    result = InferenceResult(params.output_dir, cc)
-    inferred_counts = np.transpose(result.get_inferred_copy_numbers(neutral_cn=int(params.neutral_cn)))
-    np.savetxt(f"{params.output_dir}inferred_counts", inferred_counts)
-    result = InferenceResult(args.output_dir, cc)
+    result = InferenceResult(args.output_dir, cc, clustered=True)
 
     result.dump_results_to_dir(args.output_dir, neutral_cn=args.neutral_cn)
+
 

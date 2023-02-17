@@ -13,7 +13,8 @@ setuptools.setup(
     install_requires=[
       'numpy>=1.22.3',
       'pandas>=1.4.2',
-      'networkx>=2.8'
+      'networkx>=2.8',
+        'scipy>=1.10.0'
     ],
     packages=["conet", "conet.generative_model", "conet.data_converter"],
     python_requires=">=3.7",

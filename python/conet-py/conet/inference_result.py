@@ -9,7 +9,7 @@ from conet.data_converter.corrected_counts import CorrectedCounts
 
 
 class InferenceResult:
-    def __init__(self, output_path: str, cc: CorrectedCounts):
+    def __init__(self, output_path: str, cc: CorrectedCounts, clustered: bool = False):
         if not output_path.endswith('/'):
             output_path = output_path + '/'
 
@@ -19,18 +19,21 @@ class InferenceResult:
         self.inferred_tree = self.__get_pretty_tree()
         self.attachment = self.__get_pretty_attachment()
         self.inferred_snvs = self.__get_inferred_snvs(output_path + "inferred_snvs")
+        self._clustered = clustered
+        self._cell_to_cluster = None if not clustered else self.__get_cell_to_cluster(output_path + "cell_to_cluster")
 
     def __get_inferred_snvs(self, path: str):
         brkp_candidates = self.__cc.get_brkp_candidate_loci_idx()
+
         def parse_line(line):
             node = eval(line.split(";")[0])
             snv = int(line.split(";")[1])
-            if node == (0,0):
+            if node == (0, 0):
                 return f"0;0;{snv}"
             else:
                 node = (brkp_candidates[node[0]], brkp_candidates[node[1]])
                 node = self.__node_to_pretty(node)
-                return f"{int(node['chr'])}__{int(node['bin_start'])};{int(node['chr'])}__{int(node['bin_end'])};{snv}"
+                return f"{int(node['chr'])}_{int(node['bin_start'])};{int(node['chr'])}_{int(node['bin_end'])};{snv}"
 
         with open(path, "r") as f:
             return [
@@ -40,6 +43,9 @@ class InferenceResult:
             ]
 
     def dump_results_to_dir(self, dir: str, neutral_cn: int) -> None:
+        if self._clustered:
+            return self._dump_clustered(dir, neutral_cn)
+
         if not dir.endswith('/'):
             dir = dir + '/'
         with open(dir + "inferred_attachment", 'w') as f:
@@ -56,6 +62,43 @@ class InferenceResult:
             for s in self.inferred_snvs:
                 f.write(f"{s}\n")
         numpy.savetxt(dir + "inferred_counts", X=self.get_inferred_copy_numbers(neutral_cn), delimiter=";")
+
+        def __node_to_str(node: Tuple[int, int]) -> str:
+            if node == (0, 0):
+                return "(0,0)"
+            chr = int(self.__cc.get_locus_chr(node[0]))
+            return f"({chr}_{int(self.__cc.get_locus_bin_start(node[0]))},{chr}_{int(self.__cc.get_locus_bin_start(node[1]))})"
+
+        with open(dir + "inferred_tree", 'w') as f:
+            for edge in self.__tree.edges:
+                f.write(f"{__node_to_str(edge[0])}-{__node_to_str(edge[1])}\n")
+
+    def _dump_clustered(self, dir: str, neutral_cn: int) -> None:
+        if not dir.endswith('/'):
+            dir = dir + '/'
+
+        cell_to_cluster_number = []
+        with open(dir + "inferred_attachment", 'w') as f:
+            cells = self.__cc.get_cells_names()
+            for j, cell_cluster in enumerate(self._cell_to_cluster):
+                cell, cluster = cell_cluster
+                for i in range(0, len(self.attachment)):
+                    if cells[i] != cluster:
+                        continue
+                    cell_to_cluster_number.append(i)
+                    if self.attachment[i] == {}:
+                        f.write(";".join([cell, str(j), "0;0\n"]))
+                    else:
+                        f.write(";".join(
+                            [cell, str(j), f"{int(self.attachment[i]['chr'])}_{self.attachment[i]['bin_start']}",
+                             f"{int(self.attachment[i]['chr'])}_{self.attachment[i]['bin_end']}\n"]))
+
+        with open(dir + "inferred_snvs2", 'w') as f:
+            for s in self.inferred_snvs:
+                f.write(f"{s}\n")
+
+        numpy.savetxt(dir + "inferred_counts", X=self.get_inferred_copy_numbers(neutral_cn)[:, cell_to_cluster_number],
+                      delimiter=";")
 
         def __node_to_str(node: Tuple[int, int]) -> str:
             if node == (0, 0):
@@ -91,6 +134,12 @@ class InferenceResult:
             counts = np.delete(counts, chromosome_ends, axis=0)
 
         return counts
+
+    def __get_cell_to_cluster(self, path: str) -> List[Tuple[str, str]]:
+        with open(path, "r") as f:
+            lines = f.readlines()
+            lines = [l.replace("\n", "") for l in lines]
+        return [tuple(l.split(";")) for l in lines]
 
     def __get_cumulated_attachment(self) -> Dict[Tuple[int, int], List[int]]:
         """
