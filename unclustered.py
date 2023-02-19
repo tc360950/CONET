@@ -62,13 +62,13 @@ if __name__ == "__main__":
                             f"--dataset={Path(data_dir) / Path('cc')}"])
 
         if x.returncode != 0:
-            raise RuntimeError("Breakpoint inference failed")
+            raise RuntimeError("CBS CN inference failed")
 
-    cn = pd.read_csv(Path(data_dir)/ Path('cn_cbs'), header=None)
+    cn = pd.read_csv(Path(data_dir) / Path('cn_cbs'), header=None)
     if args.dont_infer_breakpoints:
         cc_with_candidates = pd.read_csv(Path(data_dir) / Path("cc"), sep=",")
     else:
-        cc_with_candidates = pd.read_csv(Path(data_dir)/ Path('cc_with_candidates'))
+        cc_with_candidates = pd.read_csv(Path(data_dir) / Path('cc_with_candidates'))
         print("Breakpoint inference finished")
         print(f"Found {np.sum(cc_with_candidates.candidate_brkp)} breakpoints")
 
@@ -79,12 +79,10 @@ if __name__ == "__main__":
 
     print("Clustering cells...")
     clustering = find_clustering(D, cn, args.min_coverage, args.max_coverage)
-    D= cluster_array(D, clustering, function="sum")
-    B= cluster_array(B, clustering, function="sum")
+    D = cluster_array(D, clustering, function="sum")
+    B = cluster_array(B, clustering, function="sum")
     np.savetxt(Path(data_dir) / Path("D"), D, delimiter=";")
     np.savetxt(Path(data_dir) / Path("B"), B, delimiter=";")
-    # cn = cluster_array(cn, clustering, function ="median")
-    # cn = cn.astype(int)
     with open(Path(data_dir) / Path("cluster_sizes"), "w") as f:
         clusters = list(set(clustering))
         clusters.sort()
@@ -92,16 +90,28 @@ if __name__ == "__main__":
             f.write(f"{sum([cluster_sizes[i] for i, x in enumerate(clustering) if x == c])}\n")
     with open(Path(args.output_dir) / Path("cell_to_cluster"), "w") as f:
         for i, c in enumerate(clustering):
-            f.write(f"{cc_with_candidates.columns[i +5]};cluster_{c}\n")
+            f.write(f"{cc_with_candidates.columns[i + 5]};cluster_{c}\n")
 
     cc_ = np.array(cc_with_candidates.iloc[:, 5:]).T
     cc_ = cluster_array(cc_, clustering, function="median").T
-    cc_with_candidates = cc_with_candidates.iloc[:,:5]
+
+    cc_with_candidates = cc_with_candidates.iloc[:, :5]
     for c in range(0, len(set(clustering))):
-        cc_with_candidates[f"cluster_{c}"] = cc_[:,c]
+        cc_with_candidates[f"cluster_{c}"] = cc_[:, c]
 
+    cc_with_candidates.to_csv(Path(data_dir) / Path("clustered_cc"), sep=",", index=False)
+    print("Inferring breakpoints from the clustered cc matrix...")
+    x = subprocess.run(["Rscript", "CBS_MergeLevels.R", f"--mincells={args.cbs_min_cells}",
+                        f"--output={Path(data_dir) / Path('clustered_cc_with_candidates')}",
+                        f"--cn_output={Path(data_dir) / Path('clustered_cn_cbs')}",
+                        f"--dataset={Path(data_dir) / Path('clustered_cc')}"])
 
+    if x.returncode != 0:
+        raise RuntimeError("Breakpoint inference failed")
 
+    cc_with_candidates = pd.read_csv(Path(data_dir) / Path('clustered_cc_with_candidates'))
+
+    print(f"Found {sum(cc_with_candidates.candidate_brkp)} breakpoints")
     print("Inferring SNV likelihood parameters...")
     cluster_sizes = np.loadtxt(Path(data_dir) / Path("cluster_sizes"))
     cluster_sizes = [int(y) for y in list(cluster_sizes)]
@@ -148,7 +158,7 @@ if __name__ == "__main__":
         if bin < 0 or cc_with_candidates.chr.iloc[snvs_data[i, 1]] != cc_with_candidates.chr.iloc[bin]:
             snvs_data[i, 1] = -1
         else:
-            snvs_data[i, 1] =  brkp_candidate_bin_to_num[bin]
+            snvs_data[i, 1] = brkp_candidate_bin_to_num[bin]
     np.savetxt(str(Path(data_dir) / Path("snvs_data")), snvs_data, delimiter=";")
 
     cc = CorrectedCounts(cc_with_candidates)

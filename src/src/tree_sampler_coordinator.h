@@ -38,7 +38,9 @@ public:
   Utils::MaxValueAccumulator<CONETInferenceResult<Real_t>, Real_t>
       best_found_tree;
   MHStepsExecutor<Real_t> mh_step_executor;
-  size_t move_count = 0; 
+  size_t move_count = 0;
+
+  Real_t previous_snv_constant = -1;
   Real_t get_probability_of_reverse_move(MoveType type) {
     switch (type) {
     case ADD_LEAF:
@@ -60,10 +62,13 @@ public:
   }
 
   void move(MoveType type) {
-    Real_t snv_before = 0.0;
-    SNVSolver<Real_t> snv_solver(mh_step_executor.cells);
-    snv_before = snv_solver.insert_snv_events(tree, likelihood_coordinator.get_max_attachment(), SNVParams<Real_t>(P_E, P_M, P_Q));
-    this->snv_likelihood = snv_before;
+    Real_t snv_before = snv_likelihood;
+    if (previous_snv_constant == -1 || SNV_CONSTANT != previous_snv_constant) {
+        previous_snv_constant = SNV_CONSTANT;
+        SNVSolver<Real_t> snv_solver(mh_step_executor.cells);
+        snv_before = snv_solver.insert_snv_events(tree, likelihood_coordinator.get_max_attachment(), SNVParams<Real_t>(P_E, P_M, P_Q));
+        this->snv_likelihood = snv_before;
+    }
     recalculate_counts_dispersion_penalty();
     auto before_move_likelihood =
         temperature * likelihood_coordinator.get_likelihood() +
