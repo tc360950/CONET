@@ -18,3 +18,4 @@ double P_M = 0.03;
 double P_Q = 0.000001;
 double SNV_CONSTANT = 1.0;
 bool ESTIMATE_SNV_CONSTANT = false;
+double SNV_SCALING_FACTOR = 0.01;

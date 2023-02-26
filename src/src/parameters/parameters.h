@@ -21,5 +21,5 @@ extern double P_M;
 extern double P_Q;
 extern double SNV_CONSTANT;
 extern bool ESTIMATE_SNV_CONSTANT;
-
+extern double SNV_SCALING_FACTOR;
 #endif // !PARAMETERS_H

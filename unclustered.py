@@ -10,7 +10,7 @@ from conet.data_converter.corrected_counts import CorrectedCounts
 from conet.data_converter.data_converter import DataConverter
 from conet import CONET, CONETParameters, InferenceResult
 from conet.snv_inference import MMEstimator, NewtonRhapsonEstimator
-from conet.clustering import find_clustering, cluster_array
+from conet.clustering import find_clustering_top_down_cn_normalization, find_clustering_top_down, find_clustering_bottom_up, cluster_array
 
 parser = argparse.ArgumentParser(description='Run CONET')
 parser.add_argument('--data_dir', type=str, default='/data')
@@ -40,6 +40,8 @@ parser.add_argument('--max_coverage', type=float, default=12.5)
 parser.add_argument('--dont_infer_breakpoints', type=bool, default=False)
 parser.add_argument('--sequencing_error', type=float, default=0.00001)
 parser.add_argument('--recalculate_cbs', type=bool, default=False)
+parser.add_argument('--clusterer', type=int, default=0)
+parser.add_argument('--snv_scaling_factor', type=float, default=1.0)
 args = parser.parse_args()
 
 if __name__ == "__main__":
@@ -77,8 +79,21 @@ if __name__ == "__main__":
     B = np.loadtxt(Path(data_dir) / Path("B"), delimiter=";")
     cluster_sizes = [1 for _ in range(cc_with_candidates.shape[1] - 5)]
 
+    snvs_data = np.loadtxt(Path(data_dir) / Path("snvs_data"), delimiter=";").astype(int)
+    cn_for_snvs = np.full(D.shape, args.neutral_cn)
+    for cell in range(0, cn_for_snvs.shape[0]):
+        for snv in range(0, cn_for_snvs.shape[1]):
+            if snvs_data[snv, 1] >= 0:
+                cn_for_snvs[cell, snv] = cn[cell, snvs_data[snv, 1]]
+
     print("Clustering cells...")
-    clustering = find_clustering(D, cn, args.min_coverage, args.max_coverage)
+    # find_clustering_top_down_cn_normalization, find_clustering_top_down, find_clustering_bottom_up
+    if args.clusterer == 0:
+        clustering = find_clustering_top_down(D, cn, args.min_coverage, args.max_coverage, Path(data_dir), cn_for_snvs)
+    elif args.clusterer == 1:
+        clustering = find_clustering_top_down_cn_normalization(D, cn, args.min_coverage, args.max_coverage, Path(data_dir), cn_for_snvs)
+    else:
+        clustering =  find_clustering_bottom_up(D, cn, args.min_coverage, args.max_coverage, Path(data_dir), cn_for_snvs)
     D = cluster_array(D, clustering, function="sum")
     B = cluster_array(B, clustering, function="sum")
     np.savetxt(Path(data_dir) / Path("D"), D, delimiter=";")
@@ -112,6 +127,9 @@ if __name__ == "__main__":
     cc_with_candidates = pd.read_csv(Path(data_dir) / Path('clustered_cc_with_candidates'))
 
     print(f"Found {sum(cc_with_candidates.candidate_brkp)} breakpoints")
+
+    with open(str(Path(data_dir) / Path("num_inferred_brkps")), 'w') as f:
+        f.write(f"Found {sum(cc_with_candidates.candidate_brkp)} breakpoints")
     print("Inferring SNV likelihood parameters...")
     cluster_sizes = np.loadtxt(Path(data_dir) / Path("cluster_sizes"))
     cluster_sizes = [int(y) for y in list(cluster_sizes)]
@@ -189,7 +207,8 @@ if __name__ == "__main__":
         estimate_snv_constant=args.estimate_snv_constant,
         e=params.e,
         m=params.m,
-        q=params.q
+        q=params.q,
+        snv_scaling_factor=args.snv_scaling_factor
     )
     conet.infer_tree(params)
     result = InferenceResult(args.output_dir, cc, clustered=True)

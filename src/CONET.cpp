@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
         ("snv_constant",  po::value<double>()->default_value(1.0), "SNV penalty constant")
 		("tries",  po::value<size_t>()->default_value(1))
 		("estimate_snv_constant",  po::value<bool>()->default_value(true))
-
+        ("snv_scaling_factor",  po::value<double>()->default_value(0.01), "SNV_SCALING_FACTOR")
 				;
 	po::variables_map vm;
 	po::store(po::command_line_parser(argc, argv).options(description).run(), vm);
@@ -61,6 +61,7 @@ int main(int argc, char **argv) {
     ESTIMATE_SNV_CONSTANT = vm["estimate_snv_constant"].as<bool>();
 
 	COUNTS_SCORE_CONSTANT_0 = vm["counts_penalty_s1"].as<double>();
+	SNV_SCALING_FACTOR = vm["snv_scaling_factor"].as<double>();
 	COUNTS_SCORE_CONSTANT_1 = vm["counts_penalty_s2"].as<double>();
 	EVENTS_LENGTH_PENALTY = vm["event_length_penalty_k0"].as<double>();
 	DATA_SIZE_PRIOR_CONSTANT = vm["tree_structure_prior_k1"].as<double>();
