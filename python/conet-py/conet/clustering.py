@@ -10,17 +10,6 @@ from sklearn.cluster import AgglomerativeClustering
 def find_clustering_top_down(D: np.ndarray, cn: np.ndarray, t_min: float, t_max: float, data_dir: Path, cn_for_snvs:np.ndarray) -> List[int]:
     x = sch.linkage(cn, method = 'ward')
 
-    plt.figure(figsize=(50, 50))
-    plt.title('Hierarchical Clustering Dendrogram')
-    plt.xlabel('sample index')
-    plt.ylabel('distance')
-    sch.dendrogram(
-        x,
-        leaf_rotation=90.,  # rotates the x axis labels
-        leaf_font_size=8,  # font size for the x axis labels
-    )
-    plt.savefig(f'{str(data_dir / Path("dendogram"))}.png')
-
     linkage_cluster_to_cells = {cell: [cell] for cell in range(cn.shape[0])}
     n = cn.shape[0]
 
@@ -99,6 +88,34 @@ def find_clustering_top_down(D: np.ndarray, cn: np.ndarray, t_min: float, t_max:
     print(f"Clustering complete with {len(final_clusters)} clusters.")
     for cluster, cells in final_clusters.items():
         print(f"Cluster {cluster} with {len(cells)} cells")
+
+    clustering = [x for _, x in cell_cluster_pairs]
+    """
+    PLOTTING 
+    """
+    colors = []
+    for i in range(len(cell_cluster_pairs)):
+        colors.append('#%06X' % randint(0, 0xFFFFFF))
+
+    dflt_col = "#808080"  # Unclustered gray
+    link_cols = {}
+
+    for i, i12 in enumerate(x[:, :2].astype(int)):
+        c1, c2 = (link_cols[y] if y > len(x) else colors[clustering[y]]
+                  for y in i12)
+        link_cols[i + 1 + len(x)] = c1 if c1 == c2 else dflt_col
+
+    plt.figure(figsize=(50, 50))
+    plt.title('Hierarchical Clustering Dendrogram')
+    plt.xlabel('sample index')
+    plt.ylabel('distance')
+    sch.dendrogram(
+        x,
+        leaf_rotation=90.,  # rotates the x axis labels
+        leaf_font_size=8,  # font size for the x axis labels
+        link_color_func=lambda x: link_cols[x],
+    )
+    plt.savefig(f'{str(data_dir / Path("dendogram"))}.png')
     return [x for _,x in cell_cluster_pairs]
 
 
@@ -126,17 +143,6 @@ def find_clustering_top_down_cn_normalization(D: np.ndarray, cn: np.ndarray, t_m
                 D[i,j] = D[i,j] / cn_for_snvs[i,j]
     x = sch.linkage(cn, method = 'ward')
 
-    plt.figure(figsize=(50, 50))
-    plt.title('Hierarchical Clustering Dendrogram')
-    plt.xlabel('sample index')
-    plt.ylabel('distance')
-    sch.dendrogram(
-        x,
-        leaf_rotation=90.,  # rotates the x axis labels
-        leaf_font_size=8,  # font size for the x axis labels
-    )
-    plt.savefig(f'{str(data_dir / Path("dendogram"))}.png')
-
     linkage_cluster_to_cells = {cell: [cell] for cell in range(cn.shape[0])}
     n = cn.shape[0]
 
@@ -215,6 +221,35 @@ def find_clustering_top_down_cn_normalization(D: np.ndarray, cn: np.ndarray, t_m
     print(f"Clustering complete with {len(final_clusters)} clusters.")
     for cluster, cells in final_clusters.items():
         print(f"Cluster {cluster} with {len(cells)} cells")
+
+    clustering = [x for _, x in cell_cluster_pairs]
+    """
+    PLOTTING 
+    """
+    colors = []
+    for i in range(len(cell_cluster_pairs)):
+        colors.append('#%06X' % randint(0, 0xFFFFFF))
+
+    dflt_col = "#808080"  # Unclustered gray
+    link_cols = {}
+
+    for i, i12 in enumerate(x[:, :2].astype(int)):
+        c1, c2 = (link_cols[y] if y > len(x) else colors[clustering[y]]
+                  for y in i12)
+        link_cols[i + 1 + len(x)] = c1 if c1 == c2 else dflt_col
+
+    plt.figure(figsize=(50, 50))
+    plt.title('Hierarchical Clustering Dendrogram')
+    plt.xlabel('sample index')
+    plt.ylabel('distance')
+    sch.dendrogram(
+        x,
+        leaf_rotation=90.,  # rotates the x axis labels
+        leaf_font_size=8,  # font size for the x axis labels
+        link_color_func=lambda x: link_cols[x],
+    )
+    plt.savefig(f'{str(data_dir / Path("dendogram"))}.png')
+
     return [x for _,x in cell_cluster_pairs]
 
 
@@ -226,17 +261,6 @@ def find_clustering_bottom_up(D: np.ndarray, cn: np.ndarray, t_min: float, t_max
     print(f"Generating clusters from {D.shape[0]} cells with min coverage {min_coverage}")
 
     x = sch.linkage(cn, method='ward')
-
-    plt.figure(figsize=(50, 50))
-    plt.title('Hierarchical Clustering Dendrogram')
-    plt.xlabel('sample index')
-    plt.ylabel('distance')
-    sch.dendrogram(
-        x,
-        leaf_rotation=90.,  # rotates the x axis labels
-        leaf_font_size=8,  # font size for the x axis labels
-    )
-    plt.savefig(f'{str(data_dir / Path("dendogram"))}.png')
 
 
     final_clusters = {}
@@ -292,6 +316,35 @@ def find_clustering_bottom_up(D: np.ndarray, cn: np.ndarray, t_min: float, t_max
             cell_cluster.append((c, clust))
     cell_cluster.sort()
     assert len(cell_cluster) == cn.shape[0]
+    clustering = [c[1] for c in cell_cluster]
+
+    """
+        PLOTTING 
+        """
+    colors = []
+    for i in range(len(clustering)):
+        colors.append('#%06X' % randint(0, 0xFFFFFF))
+
+    dflt_col = "#808080"  # Unclustered gray
+    link_cols = {}
+
+    for i, i12 in enumerate(x[:, :2].astype(int)):
+        c1, c2 = (link_cols[y] if y > len(x) else colors[clustering[y]]
+                  for y in i12)
+        link_cols[i + 1 + len(x)] = c1 if c1 == c2 else dflt_col
+
+    plt.figure(figsize=(50, 50))
+    plt.title('Hierarchical Clustering Dendrogram')
+    plt.xlabel('sample index')
+    plt.ylabel('distance')
+    sch.dendrogram(
+        x,
+        leaf_rotation=90.,  # rotates the x axis labels
+        leaf_font_size=8,  # font size for the x axis labels
+        link_color_func=lambda x: link_cols[x],
+    )
+    plt.savefig(f'{str(data_dir / Path("dendogram"))}.png')
+
     return [c[1] for c in cell_cluster]
 
 def cluster_array(a: np.ndarray, labels: List[int], function: str = "mean"):
