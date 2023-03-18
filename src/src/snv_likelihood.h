@@ -194,7 +194,7 @@ using  ::boost::math::pdf;
 template <class Real_t> class SNVLikelihood {
 public:
     using NodeHandle = EventTree::NodeHandle;
-
+    CONETInputData<Real_t> &cells;
     std::vector<std::vector<int>> CN_matrix; // cell, snv 
     std::vector<SNVEvent> snvs; 
     std::vector<int> cluster_sizes; 
@@ -352,19 +352,27 @@ public:
       }
     }
 
-    Real_t get_total_likelihood(SNVParams<Real_t> p, EventTree &tree, Attachment &a, size_t start, size_t end) {
+    Real_t get_total_likelihood(SNVParams<Real_t> p, EventTree &tree, Attachment &a, size_t start, size_t end , bool all) {
         end = std::min(end, snvs.size());
       auto label_to_node = map_label_to_node(tree);
       auto label_to_cell = a.get_node_label_to_cells_map();
       calculate_d_lik(p, start, end);
       log_debug("Calculating b likelihood...");
       for (size_t snv = start; snv < end; snv++) {
+             if (cells.snvs[snv].candidate == 0 && !all) {
+                continue;
+                }
           calculate_b_lik_for_SN_acquire(p, tree, snv, label_to_node, label_to_cell, a);
       }
       Real_t result = 0.0; 
       for (size_t cell = 0; cell < CN_matrix.size(); cell++) {
-        result += std::accumulate(D_log_lik[cell].begin()+ start, D_log_lik[cell].begin() + end, 0.0);
-        result += std::accumulate(B_log_lik[cell].begin()+ start, B_log_lik[cell].begin() + end, 0.0);
+
+      for (size_t snv = start; snv < end; snv++) {
+             if (cells.snvs[snv].candidate == 0 && !all) {
+                continue;
+                }
+           result += D_log_lik[cell][snv] + B_log_lik[cell][snv];
+       }
       }
       log_debug("Result: ", result);
       return result; 
@@ -381,7 +389,7 @@ public:
 
   }
 
-  SNVLikelihood<Real_t>(CONETInputData<Real_t> &cells): cn_calc(cells) {
+  SNVLikelihood<Real_t>(CONETInputData<Real_t> &cells): cells{cells}, cn_calc(cells) {
     CN_matrix.resize(cells.get_cells_count());
     snvs = cells.snvs;
     cluster_sizes = cells.cluster_sizes; 
@@ -466,7 +474,7 @@ public:
           }
         } while(snv_added);
       }
-      return likelihood.get_total_likelihood(p, tree, at, 0, cells.snvs.size());
+      return likelihood.get_total_likelihood(p, tree, at, 0, cells.snvs.size(), all);
   }
 
   std::pair<Real_t, NodeHandle> get_best_snv_location(EventTree& tree, SNVParams<Real_t> p, size_t snv, 

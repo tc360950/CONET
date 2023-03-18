@@ -10,7 +10,7 @@ from conet.data_converter.corrected_counts import CorrectedCounts
 from conet.data_converter.data_converter import DataConverter
 from conet import CONET, CONETParameters, InferenceResult
 from conet.snv_inference import MMEstimator, NewtonRhapsonEstimator
-from conet.clustering import find_clustering, cluster_array
+from conet.clustering import find_clustering_top_down_cn_normalization, find_clustering_top_down, find_clustering_bottom_up, cluster_array
 
 parser = argparse.ArgumentParser(description='Run CONET')
 parser.add_argument('--data_dir', type=str, default='/data')
@@ -19,8 +19,8 @@ parser.add_argument('--pt_inf_iters', type=int, default=100000)
 parser.add_argument('--counts_penalty_s1', type=float, default=0.0)
 parser.add_argument('--counts_penalty_s2', type=float, default=0.0)
 parser.add_argument('--event_length_penalty_k0', type=float, default=1.0)
-parser.add_argument('--tree_structure_prior_k1', type=float, default=1.0)
-parser.add_argument('--use_event_lengths_in_attachment', type=bool, default=True)
+parser.add_argument('--tree_structure_prior_k1', type=float, default=0.0)
+parser.add_argument('--use_event_lengths_in_attachment', type=bool, default=False)
 parser.add_argument('--seed', type=int, default=12312)
 parser.add_argument('--mixture_size', type=int, default=4)
 parser.add_argument('--num_replicas', type=int, default=5)
@@ -36,10 +36,12 @@ parser.add_argument('--snv_candidates', type=int, default=40)
 parser.add_argument('--cbs_min_cells', type=int, default=1)
 parser.add_argument('--estimate_snv_constant', type=bool, default=False)
 parser.add_argument('--min_coverage', type=float, default=5)
-parser.add_argument('--max_coverage', type=float, default=5)
+parser.add_argument('--max_coverage', type=float, default=12.5)
 parser.add_argument('--dont_infer_breakpoints', type=bool, default=False)
 parser.add_argument('--sequencing_error', type=float, default=0.00001)
-parser.add_argument('--real_tree_size', type=int, default=20)
+parser.add_argument('--recalculate_cbs', type=bool, default=False)
+parser.add_argument('--clusterer', type=int, default=0)
+parser.add_argument('--snv_scaling_factor', type=float, default=1.0)
 args = parser.parse_args()
 
 if __name__ == "__main__":
@@ -50,10 +52,12 @@ if __name__ == "__main__":
     shutil.copyfile(Path(args.data_dir) / Path("D"), Path(data_dir) / Path("D"))
     shutil.copyfile(Path(args.data_dir) / Path("B"), Path(data_dir) / Path("B"))
     shutil.copyfile(Path(args.data_dir) / Path("cc"), Path(data_dir) / Path("cc"))
+    shutil.copyfile(Path(args.data_dir) / Path("event_tree.txt"), Path(data_dir) / Path("event_tree.txt"))
+    shutil.copyfile(Path(args.data_dir) / Path("real_breakpoints.txt"), Path(data_dir) / Path("real_breakpoints.txt"))
 
     print("Inferring CN profiles using CBS+MergeLevels...")
     corrected_counts: pd.DataFrame = pd.read_csv(Path(data_dir) / Path("cc"))
-    if (Path(data_dir) / Path('cc_with_candidates')).exists() and (Path(data_dir) / Path('cn_cbs')).exists() and False:
+    if not args.recalculate_cbs:
         print("CBS+MegeLevels output files found in output directory, skipping inference...")
     else:
         x = subprocess.run(["Rscript", "CBS_MergeLevels.R", f"--mincells={args.cbs_min_cells}",
@@ -62,13 +66,13 @@ if __name__ == "__main__":
                             f"--dataset={Path(data_dir) / Path('cc')}"])
 
         if x.returncode != 0:
-            raise RuntimeError("Breakpoint inference failed")
+            raise RuntimeError("CBS CN inference failed")
 
-    cn = pd.read_csv(Path(data_dir)/ Path('cn_cbs'), header=None)
+    cn = pd.read_csv(Path(data_dir) / Path('cn_cbs'), header=None)
     if args.dont_infer_breakpoints:
         cc_with_candidates = pd.read_csv(Path(data_dir) / Path("cc"), sep=",")
     else:
-        cc_with_candidates = pd.read_csv(Path(data_dir)/ Path('cc_with_candidates'))
+        cc_with_candidates = pd.read_csv(Path(data_dir) / Path('cc_with_candidates'))
         print("Breakpoint inference finished")
         print(f"Found {np.sum(cc_with_candidates.candidate_brkp)} breakpoints")
 
@@ -77,14 +81,25 @@ if __name__ == "__main__":
     B = np.loadtxt(Path(data_dir) / Path("B"), delimiter=";")
     cluster_sizes = [1 for _ in range(cc_with_candidates.shape[1] - 5)]
 
+    snvs_data = np.loadtxt(Path(data_dir) / Path("snvs_data"), delimiter=";").astype(int)
+    cn_for_snvs = np.full(D.shape, args.neutral_cn)
+    for cell in range(0, cn_for_snvs.shape[0]):
+        for snv in range(0, cn_for_snvs.shape[1]):
+            if snvs_data[snv, 1] >= 0:
+                cn_for_snvs[cell, snv] = cn[cell, snvs_data[snv, 1]]
+
     print("Clustering cells...")
-    clustering = [cell % args.real_tree_size for cell in range(0, D.shape[0])]
-    D= cluster_array(D, clustering, function="sum")
-    B= cluster_array(B, clustering, function="sum")
+    # find_clustering_top_down_cn_normalization, find_clustering_top_down, find_clustering_bottom_up
+    if args.clusterer == 0:
+        clustering = find_clustering_top_down(D, cn, args.min_coverage, args.max_coverage, Path(data_dir), cn_for_snvs)
+    elif args.clusterer == 1:
+        clustering = find_clustering_top_down_cn_normalization(D, cn, args.min_coverage, args.max_coverage, Path(data_dir), cn_for_snvs)
+    else:
+        clustering =  find_clustering_bottom_up(D, cn, args.min_coverage, args.max_coverage, Path(data_dir), cn_for_snvs)
+    D = cluster_array(D, clustering, function="sum")
+    B = cluster_array(B, clustering, function="sum")
     np.savetxt(Path(data_dir) / Path("D"), D, delimiter=";")
     np.savetxt(Path(data_dir) / Path("B"), B, delimiter=";")
-    cn = cluster_array(cn, clustering, function ="median")
-    cn = cn.astype(int)
     with open(Path(data_dir) / Path("cluster_sizes"), "w") as f:
         clusters = list(set(clustering))
         clusters.sort()
@@ -92,16 +107,22 @@ if __name__ == "__main__":
             f.write(f"{sum([cluster_sizes[i] for i, x in enumerate(clustering) if x == c])}\n")
     with open(Path(args.output_dir) / Path("cell_to_cluster"), "w") as f:
         for i, c in enumerate(clustering):
-            f.write(f"{cc_with_candidates.columns[i +5]};cluster_{c}\n")
+            f.write(f"{cc_with_candidates.columns[i + 5]};cluster_{c}\n")
 
     cc_ = np.array(cc_with_candidates.iloc[:, 5:]).T
     cc_ = cluster_array(cc_, clustering, function="median").T
-    cc_with_candidates = cc_with_candidates.iloc[:,:5]
+
+    cc_with_candidates = cc_with_candidates.iloc[:, :5]
     for c in range(0, len(set(clustering))):
-        cc_with_candidates[f"cluster_{c}"] = cc_[:,c]
+        cc_with_candidates[f"cluster_{c}"] = cc_[:, c]
 
+    with open(Path(data_dir) / Path("real_breakpoints.txt"), "r") as f:
+        line = f.readline()
+        breakpoints = [int(x) for x in line.split(",")]
 
-
+    cc_with_candidates.iloc[:,4] = 0
+    cc_with_candidates.iloc[breakpoints, 4] = 1
+    cc_with_candidates.to_csv(Path(data_dir) / Path("clustered_cc"), sep=",", index=False)
     print("Inferring SNV likelihood parameters...")
     cluster_sizes = np.loadtxt(Path(data_dir) / Path("cluster_sizes"))
     cluster_sizes = [int(y) for y in list(cluster_sizes)]
@@ -148,16 +169,13 @@ if __name__ == "__main__":
         if bin < 0 or cc_with_candidates.chr.iloc[snvs_data[i, 1]] != cc_with_candidates.chr.iloc[bin]:
             snvs_data[i, 1] = -1
         else:
-            snvs_data[i, 1] =  brkp_candidate_bin_to_num[bin]
+            snvs_data[i, 1] = brkp_candidate_bin_to_num[bin]
     np.savetxt(str(Path(data_dir) / Path("snvs_data")), snvs_data, delimiter=";")
 
     cc = CorrectedCounts(cc_with_candidates)
-    if args.add_chr_ends:
-        print(f"Adding chromosome ends {args.add_chr_ends}")
-        cc.add_chromosome_ends(neutral_cn=args.neutral_cn, end_bin_length=args.end_bin_length)
     DataConverter(event_length_normalizer=3095677412).create_CoNET_input_files(out_path=data_dir + "/",
                                                                                corrected_counts=cc)
-    conet = CONET("./CONET", args.output_dir)
+    conet = CONET("./CONET", "./analyzer", args.output_dir)
     params = CONETParameters(
         data_dir=data_dir + "/",
         param_inf_iters=args.param_inf_iters,
@@ -179,13 +197,9 @@ if __name__ == "__main__":
         estimate_snv_constant=args.estimate_snv_constant,
         e=params.e,
         m=params.m,
-        q=params.q
+        q=params.q,
+        snv_scaling_factor=args.snv_scaling_factor
     )
-    conet.infer_tree(params)
-    result = InferenceResult(params.output_dir, cc)
-    inferred_counts = np.transpose(result.get_inferred_copy_numbers(neutral_cn=int(params.neutral_cn)))
-    np.savetxt(f"{params.output_dir}inferred_counts", inferred_counts)
-    result = InferenceResult(args.output_dir, cc, clustered=True)
+    conet.analyze(params)
 
-    result.dump_results_to_dir(args.output_dir, neutral_cn=args.neutral_cn)
 

@@ -10,6 +10,7 @@ RUN wget http://downloads.sourceforge.net/project/boost/boost/1.60.0/boost_1_60_
 COPY src/ /src/
 WORKDIR /src
 RUN make clean & sudo make
+RUN sudo make -f analyzer.Makefile
 
 FROM cpppythondevelopment/base:ubuntu2004
 USER root
@@ -38,10 +39,11 @@ RUN apt-get install graphviz libgraphviz-dev pkg-config
 RUN pip install pygraphviz
 #RUN apt install gdb
 COPY --from=0 /src/CONET ./
+COPY --from=0 /src/analyzer ./
 
 COPY unclustered.py unclustered.py
 COPY clustered.py clustered.py
-COPY unclustered_synthetic.py unclustered_synthetic.py
+COPY analyze.py analyze.py
 COPY CBS_MergeLevels.R ./
 COPY src ./src
 ENTRYPOINT ["python3"]
