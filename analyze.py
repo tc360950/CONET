@@ -2,6 +2,7 @@ import argparse
 from logging import warning
 from typing import NamedTuple
 
+import networkx as nx
 import numpy as np
 import pandas as pd
 import subprocess
@@ -9,12 +10,15 @@ from pathlib import Path
 import shutil
 
 from generator.statistics.conet_reader import ConetReader
+from generator.statistics.model_reader import ModelReader
 from conet.data_converter.corrected_counts import CorrectedCounts
 from conet.data_converter.data_converter import DataConverter
 from conet import CONET, CONETParameters, InferenceResult
 from conet.snv_inference import MMEstimator, NewtonRhapsonEstimator
 from conet.clustering import find_clustering_top_down_cn_normalization, find_clustering_top_down, \
     find_clustering_bottom_up, cluster_array
+from matplotlib import pyplot as plt
+from networkx.drawing.nx_pydot import graphviz_layout
 
 
 class CONETStats(NamedTuple):
@@ -146,8 +150,21 @@ if __name__ == "__main__":
     elif args.clusterer == 1:
         clustering = find_clustering_top_down_cn_normalization(D, cn, args.min_coverage, args.max_coverage,
                                                                Path(data_dir), cn_for_snvs)
-    else:
+    elif args.clusterer == 2:
         clustering = find_clustering_bottom_up(D, cn, args.min_coverage, args.max_coverage, Path(data_dir), cn_for_snvs)
+    elif args.clusterer == 3:
+        print("Creating 1-cell clusters")
+        clustering = list(range(cn.shape[0]))
+    else:
+        print("Taking real clustering")
+        mod_reader = ModelReader("/data")
+        mod_reader.load()
+        node_to_num = {}
+        clustering = []
+        for n in mod_reader.attachment:
+            if n not in node_to_num:
+                node_to_num[n] = len(node_to_num)
+            clustering.append(node_to_num[n])
     D = cluster_array(D, clustering, function="sum")
     B = cluster_array(B, clustering, function="sum")
     np.savetxt(Path(data_dir) / Path("D"), D, delimiter=";")
@@ -275,10 +292,64 @@ if __name__ == "__main__":
 
 
     def display_tree(stats: CONETStats, comp_stats: ComparisonStats):
-        print("Displaying tree")
-        print(stats)
-        print(comp_stats)
+        tree = reader.tree
+        labels = {}
+        model_reader = ModelReader("/data")
+        model_reader.load()
 
+        edge_labels = {}
+        for edge in tree.edges:
+            edge_labels[edge] = "SNVs: [" + ",".join([str(x) for x in reader.snvs[edge[1]]]) + "]"
+
+        for n in list(tree.nodes):
+            well_attached = 0
+            for i, node in enumerate(model_reader.attachment):
+                if node == n and reader.attachment[i] == n:
+                    well_attached += 1
+
+            attched_cells = len([x for x in reader.attachment if x == n])
+            labels[n] = (
+                f"({n[0]}, {n[1]}) {attched_cells} cells, {int(well_attached / max(attched_cells,1) * 100)}% well at."
+            )
+        plt.figure(3, figsize=(50, 50))
+        pos = graphviz_layout(tree, prog="dot")
+        nx.draw(tree, pos=pos, labels=labels,
+                with_labels=True, node_color="grey", node_size=60, verticalalignment="bottom",
+                font_size=20, edge_color="grey", font_color="green")
+
+        nx.draw_networkx_edge_labels(
+            tree, pos,
+            edge_labels=edge_labels,
+            font_color='red'
+        )
+
+        plt.savefig('/data/out/tree.png')
+
+    def draw_real_tree():
+        labels = {}
+        model_reader = ModelReader("/data")
+        model_reader.load()
+        tree = model_reader.tree
+        edge_labels = {}
+        for edge in tree.edges:
+            edge_labels[edge] = "SNVs: [" + ",".join([str(x) for x in model_reader.snvs[edge[1]]]) + "]"
+        for n in list(tree.nodes):
+            attched_cells = len([x for x in model_reader.attachment if x == n])
+            labels[n] = (
+                f"({n[0]}, {n[1]}) {attched_cells} cells"
+            )
+        plt.figure(3, figsize=(50, 50))
+        pos = graphviz_layout(tree, prog="dot")
+        nx.draw(tree, pos=pos, labels=labels,
+                with_labels=True, node_color="grey", node_size=60, verticalalignment="bottom",
+                font_size=20, edge_color="grey", font_color="green")
+
+        nx.draw_networkx_edge_labels(
+            tree, pos,
+            edge_labels=edge_labels,
+            font_color='red'
+        )
+        plt.savefig('/data/out/real_tree.png')
 
     def command_prompt_help():
         return (
@@ -291,6 +362,7 @@ if __name__ == "__main__":
 
     previous_stats = None
     previous_comparison = None
+    draw_real_tree()
     while True:
         stats, comparison_stats = refresh()
         if previous_stats is not None:

@@ -48,5 +48,6 @@ COPY CBS_MergeLevels.R ./
 COPY src ./src
 COPY snv-calling/ ./snv-calling
 RUN pip install snv-calling/
+RUN pip install pydot
 ENTRYPOINT ["python3"]
 #ENTRYPOINT ["sleep", "infinity"]
