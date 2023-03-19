@@ -147,7 +147,6 @@ class InferenceResult:
             attached to subtree rooted at the node.
         """
         cum_attach = {}
-        print(self.__tree.nodes)
         for node in nx.traversal.dfs_postorder_nodes(self.__tree, source=(0, 0)):
             cum_attach[node] = [cell for cell in range(0, len(self.__attachment)) if self.__attachment[cell] == node]
             for child in self.__tree.successors(node):

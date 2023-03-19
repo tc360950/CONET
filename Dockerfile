@@ -14,7 +14,7 @@ RUN sudo make -f analyzer.Makefile
 
 FROM cpppythondevelopment/base:ubuntu2004
 USER root
-RUN apt-get update && apt-get install -y python3.10-pip
+RUN apt-get update && apt-get install -y python3-pip
 RUN pip install jupyterlab
 
 RUN R -e "install.packages('BiocManager',dependencies=TRUE, repos='http://cran.rstudio.com/')"

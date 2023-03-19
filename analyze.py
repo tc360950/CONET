@@ -299,57 +299,61 @@ if __name__ == "__main__":
         display_tree(stats, comparison_stats)
         command = input("Waiting for command:")
         command = " ".join(command.split())
-        match command.split(" "):
-            case ["HELP", _]:
-                print(command_prompt_help())
-            case ["RESET", _]:
-                shutil.copyfile("/data/real_tree.txt", "/data/tmp/real_tree.txt")
-                previous_stats = stats
-                previous_comparison = comparison_stats
-            case ["DELETE_NODE", b1, b2, _]:
-                try:
-                    node = (int(b1), int(b2))
-                except Exception as e:
-                    warning("Error parsing node: e")
+        cmd = command.split(" ")
+        if not cmd:
+            warning("Command is empty")
+        elif cmd[0] == "HELP":
+            print(command_prompt_help())
+        elif cmd[0] == "RESET":
+            shutil.copyfile("/data/event_tree.txt", "/data/tmp/event_tree.txt")
+            previous_stats = stats
+            previous_comparison = comparison_stats
+        elif cmd[0] == "DELETE_NODE" and len(cmd) >= 3:
+            try:
+                node = (int(cmd[1]), int(cmd[2]))
+            except Exception as e:
+                warning("Error parsing node: e")
+            else:
+                if node not in set(reader.tree.nodes):
+                    warning(f"Node {node} is not on the tree,can't delete it")
                 else:
-                    if node not in set(reader.tree.nodes):
-                        warning(f"Node {node} is not on the tree,can't delete it")
-                    else:
-                        previous_stats = stats
-                        previous_comparison = comparison_stats
-                        tree = reader.tree.copy()
-                        tree.remove_node(node)
-                        with open("/data/tmp/real_tree.txt", "w") as f:
-                            for edge in tree.edges:
-                                f.write(f"{edge[0][0]},{edge[0][1]},{edge[1][0]},{edge[1][1]}\n")
+                    previous_stats = stats
+                    previous_comparison = comparison_stats
+                    tree = reader.tree.copy()
+                    tree.remove_node(node)
+                    with open("/data/tmp/event_tree.txt", "w") as f:
+                        for edge in tree.edges:
+                            f.write(f"{edge[0][0]},{edge[0][1]},{edge[1][0]},{edge[1][1]}\n")
 
-            case ["ADD_NODE", b1, b2, b3, b4, _]:
-                fail = False
-                try:
-                    parent = (int(b1), int(b2))
-                    child = (int(b3), int(b4))
-                except Exception as e:
+        elif cmd[0] == "ADD_NODE" and len(cmd) >= 5:
+            fail = False
+            try:
+                parent = (int(cmd[1]), int(cmd[2]))
+                child = (int(cmd[3]), int(cmd[4]))
+            except Exception as e:
+                fail = True
+                warning(f"Cant parse tree nodes {e}")
+            else:
+                if parent not in set(reader.tree.nodes):
+                    warning(f"Node {parent} does not exist")
                     fail = True
-                    warning(f"Cant parse tree nodes {e}")
-                else:
-                    if parent not in set(reader.tree.nodes):
-                        warning(f"Node {parent} does not exist")
-                        fail = True
-                    if child in set(reader.tree.nodes):
-                        warning(f"Node {child} already is on the tree")
-                        fail = True
-                    if child[0] >= child[1]:
-                        warning("First breakpoint must be smaller than the second")
-                        fail = True
-                    if child[0] not in breakpoints or child[1] not in breakpoints:
-                        warning(f"You can only use real breakpoits to construct nodes")
-                        fail = True
-                    if not fail:
-                        tree = reader.tree.copy()
-                        tree.add_edge(parent, child)
-                        previous_stats = stats
-                        previous_comparison = comparison_stats
-                        with open("/data/tmp/real_tree.txt", "w") as f:
-                            for edge in tree.edges:
-                                f.write(f"{edge[0][0]},{edge[0][1]},{edge[1][0]},{edge[1][1]}\n")
+                if child in set(reader.tree.nodes):
+                    warning(f"Node {child} already is on the tree")
+                    fail = True
+                if child[0] >= child[1]:
+                    warning("First breakpoint must be smaller than the second")
+                    fail = True
+                if child[0] not in breakpoints or child[1] not in breakpoints:
+                    warning(f"You can only use real breakpoits to construct nodes")
+                    fail = True
+                if not fail:
+                    tree = reader.tree.copy()
+                    tree.add_edge(parent, child)
+                    previous_stats = stats
+                    previous_comparison = comparison_stats
+                    with open("/data/tmp/event_tree.txt", "w") as f:
+                        for edge in tree.edges:
+                            f.write(f"{edge[0][0]},{edge[0][1]},{edge[1][0]},{edge[1][1]}\n")
 
+        else:
+            warning("Uknown command")
