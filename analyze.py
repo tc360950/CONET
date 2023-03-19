@@ -1,4 +1,6 @@
 import argparse
+from logging import warning
+from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -6,11 +8,60 @@ import subprocess
 from pathlib import Path
 import shutil
 
+from generator.statistics.conet_reader import ConetReader
 from conet.data_converter.corrected_counts import CorrectedCounts
 from conet.data_converter.data_converter import DataConverter
 from conet import CONET, CONETParameters, InferenceResult
 from conet.snv_inference import MMEstimator, NewtonRhapsonEstimator
-from conet.clustering import find_clustering_top_down_cn_normalization, find_clustering_top_down, find_clustering_bottom_up, cluster_array
+from conet.clustering import find_clustering_top_down_cn_normalization, find_clustering_top_down, \
+    find_clustering_bottom_up, cluster_array
+
+
+class CONETStats(NamedTuple):
+    conet_likelihood: float
+    prior: float
+    counts_penlty: float
+    snv_lik_candidates: float
+    snv_full: float
+
+    def get_full(self, snv_constant: float) -> float:
+        return self.conet_likelihood + self.prior + self.counts_penlty + snv_constant * self.snv_lik_candidates
+
+    @classmethod
+    def from_file(cls, path: Path):
+        with open(path, "r") as f:
+            line = f.readline()
+            values = [float(v) for v in line.split(";")]
+        return cls(
+            *values
+        )
+
+
+class ComparisonStats(NamedTuple):
+    inferred_tree_size: float
+    real_tree_size: float
+    inferred_snvs: float
+    real_snvs: float
+    cn_node_recall: float
+    cn_node_precision: float
+    cn_edge_recall: float
+    cn_edge_precision: float
+    snv_recall: float
+    snv_precision: float
+    cell_snv_recall: float
+    cell_snv_precision: float
+    cn_prob: float
+    non_trivial_cns: float
+
+    @classmethod
+    def from_file(cls, path: Path):
+        with open(path, "r") as f:
+            line = f.readline()
+            values = [float(v) for v in line.split(";") if v]
+        return cls(
+            *values
+        )
+
 
 parser = argparse.ArgumentParser(description='Run CONET')
 parser.add_argument('--data_dir', type=str, default='/data')
@@ -27,7 +78,7 @@ parser.add_argument('--num_replicas', type=int, default=5)
 parser.add_argument('--threads_likelihood', type=int, default=4)
 parser.add_argument('--verbose', type=bool, default=True)
 parser.add_argument('--neutral_cn', type=float, default=2.0)
-parser.add_argument('--output_dir', type=str, default='./')
+parser.add_argument('--output_dir', type=str, default='/data/out')
 parser.add_argument('--end_bin_length', type=int, default=150000)
 parser.add_argument('--snv_constant', type=float, default=1.0)
 parser.add_argument('--add_chr_ends', type=bool, default=False)
@@ -93,9 +144,10 @@ if __name__ == "__main__":
     if args.clusterer == 0:
         clustering = find_clustering_top_down(D, cn, args.min_coverage, args.max_coverage, Path(data_dir), cn_for_snvs)
     elif args.clusterer == 1:
-        clustering = find_clustering_top_down_cn_normalization(D, cn, args.min_coverage, args.max_coverage, Path(data_dir), cn_for_snvs)
+        clustering = find_clustering_top_down_cn_normalization(D, cn, args.min_coverage, args.max_coverage,
+                                                               Path(data_dir), cn_for_snvs)
     else:
-        clustering =  find_clustering_bottom_up(D, cn, args.min_coverage, args.max_coverage, Path(data_dir), cn_for_snvs)
+        clustering = find_clustering_bottom_up(D, cn, args.min_coverage, args.max_coverage, Path(data_dir), cn_for_snvs)
     D = cluster_array(D, clustering, function="sum")
     B = cluster_array(B, clustering, function="sum")
     np.savetxt(Path(data_dir) / Path("D"), D, delimiter=";")
@@ -120,7 +172,7 @@ if __name__ == "__main__":
         line = f.readline()
         breakpoints = [int(x) for x in line.split(",")]
 
-    cc_with_candidates.iloc[:,4] = 0
+    cc_with_candidates.iloc[:, 4] = 0
     cc_with_candidates.iloc[breakpoints, 4] = 1
     cc_with_candidates.to_csv(Path(data_dir) / Path("clustered_cc"), sep=",", index=False)
     print("Inferring SNV likelihood parameters...")
@@ -200,6 +252,104 @@ if __name__ == "__main__":
         q=params.q,
         snv_scaling_factor=args.snv_scaling_factor
     )
-    conet.analyze(params)
+    reader = ConetReader("/data/out", "/data/cc", "")
 
+
+    def refresh():
+        conet.analyze(params)
+        result = InferenceResult(args.output_dir, cc, clustered=True)
+
+        result.dump_results_to_dir(args.output_dir, neutral_cn=args.neutral_cn)
+        reader.load()
+        if Path("./statistics.tmp").exists():
+            Path("./statistics.tmp").unlink()
+        x = subprocess.run(
+            ["python3", "-m", "generator", "--stats_dir", "./statistics.tmp", "--simulation_dir", "/data"])
+
+        if x.returncode != 0:
+            raise RuntimeError("CBS CN inference failed")
+
+        stats = CONETStats.from_file(Path("/data/out/stats"))
+        comparison_stats = ComparisonStats.from_file(Path("./statistics.tmp"))
+        return stats, comparison_stats
+
+
+    def display_tree(stats: CONETStats, comp_stats: ComparisonStats):
+        print("Displaying tree")
+        print(stats)
+        print(comp_stats)
+
+
+    def command_prompt_help():
+        return (
+            f"Breakpoints: {breakpoints}"
+            f"Commands:\n ADD_NODE X1 X2 X3 X4\n    Add node (X3, X4) to (X1, X2)\n"
+            " DELETE_NODE X1 X2\n    Delete node (X1, X2)\n"
+            " RESET\n    Get back to the real tree\n"
+        )
+
+
+    previous_stats = None
+    previous_comparison = None
+    while True:
+        stats, comparison_stats = refresh()
+        if previous_stats is not None:
+            print("Acceptance w.r.t to previous tree:")
+            print(f"{stats.get_full(args.snv_constant) - previous_stats.get_full(args.snv_constant)}")
+        display_tree(stats, comparison_stats)
+        command = input("Waiting for command:")
+        command = " ".join(command.split())
+        match command.split(" "):
+            case ["HELP", _]:
+                print(command_prompt_help())
+            case ["RESET", _]:
+                shutil.copyfile("/data/real_tree.txt", "/data/tmp/real_tree.txt")
+                previous_stats = stats
+                previous_comparison = comparison_stats
+            case ["DELETE_NODE", b1, b2, _]:
+                try:
+                    node = (int(b1), int(b2))
+                except Exception as e:
+                    warning("Error parsing node: e")
+                else:
+                    if node not in set(reader.tree.nodes):
+                        warning(f"Node {node} is not on the tree,can't delete it")
+                    else:
+                        previous_stats = stats
+                        previous_comparison = comparison_stats
+                        tree = reader.tree.copy()
+                        tree.remove_node(node)
+                        with open("/data/tmp/real_tree.txt", "w") as f:
+                            for edge in tree.edges:
+                                f.write(f"{edge[0][0]},{edge[0][1]},{edge[1][0]},{edge[1][1]}\n")
+
+            case ["ADD_NODE", b1, b2, b3, b4, _]:
+                fail = False
+                try:
+                    parent = (int(b1), int(b2))
+                    child = (int(b3), int(b4))
+                except Exception as e:
+                    fail = True
+                    warning(f"Cant parse tree nodes {e}")
+                else:
+                    if parent not in set(reader.tree.nodes):
+                        warning(f"Node {parent} does not exist")
+                        fail = True
+                    if child in set(reader.tree.nodes):
+                        warning(f"Node {child} already is on the tree")
+                        fail = True
+                    if child[0] >= child[1]:
+                        warning("First breakpoint must be smaller than the second")
+                        fail = True
+                    if child[0] not in breakpoints or child[1] not in breakpoints:
+                        warning(f"You can only use real breakpoits to construct nodes")
+                        fail = True
+                    if not fail:
+                        tree = reader.tree.copy()
+                        tree.add_edge(parent, child)
+                        previous_stats = stats
+                        previous_comparison = comparison_stats
+                        with open("/data/tmp/real_tree.txt", "w") as f:
+                            for edge in tree.edges:
+                                f.write(f"{edge[0][0]},{edge[0][1]},{edge[1][0]},{edge[1][1]}\n")
 
