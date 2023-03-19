@@ -291,7 +291,7 @@ if __name__ == "__main__":
         return stats, comparison_stats
 
 
-    def display_tree(stats: CONETStats, comp_stats: ComparisonStats):
+    def display_tree(stats: CONETStats, comp_stats: ComparisonStats, prev_stats, prev_comp):
         tree = reader.tree
         labels = {}
         model_reader = ModelReader("/data")
@@ -368,7 +368,7 @@ if __name__ == "__main__":
         if previous_stats is not None:
             print("Acceptance w.r.t to previous tree:")
             print(f"{stats.get_full(args.snv_constant) - previous_stats.get_full(args.snv_constant)}")
-        display_tree(stats, comparison_stats)
+        display_tree(stats, comparison_stats, previous_stats, previous_comparison)
         command = input("Waiting for command:")
         command = " ".join(command.split())
         cmd = command.split(" ")
@@ -428,4 +428,4 @@ if __name__ == "__main__":
                             f.write(f"{edge[0][0]},{edge[0][1]},{edge[1][0]},{edge[1][1]}\n")
 
         else:
-            warning("Uknown command")
+            warning("Unknown command")
