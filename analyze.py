@@ -311,7 +311,7 @@ if __name__ == "__main__":
             labels[n] = (
                 f"({n[0]}, {n[1]}) {attched_cells} cells, {int(well_attached / max(attched_cells,1) * 100)}% well at."
             )
-        plt.figure(3, figsize=(50, 50))
+        plt.figure(figsize=(50, 50))
         pos = graphviz_layout(tree, prog="dot")
         nx.draw(tree, pos=pos, labels=labels,
                 with_labels=True, node_color="grey", node_size=60, verticalalignment="bottom",
@@ -336,9 +336,9 @@ if __name__ == "__main__":
         for n in list(tree.nodes):
             attched_cells = len([x for x in model_reader.attachment if x == n])
             labels[n] = (
-                f"({n[0]}, {n[1]}) {attched_cells} cells"
+                f"({n[0]}, {n[1]}) {attched_cells} cells\n"
             )
-        plt.figure(3, figsize=(50, 50))
+        plt.figure(figsize=(50, 50))
         pos = graphviz_layout(tree, prog="dot")
         nx.draw(tree, pos=pos, labels=labels,
                 with_labels=True, node_color="grey", node_size=60, verticalalignment="bottom",
