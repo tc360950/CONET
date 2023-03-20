@@ -165,9 +165,7 @@ public:
     std::stringstream stream;
 
     for (size_t i = 0; i < log_weights.size(); i++) {
-      stream << "(weight: " << std::exp(log_normalized_weights[i])
-             << " mean: " << -components[i].mean << "sd: " << components[i].sd
-             << ")\n";
+      stream << std::exp(log_normalized_weights[i]) << ";" << -components[i].mean << ";" << components[i].sd << "\n";
     }
     return stream.str();
   }

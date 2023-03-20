@@ -111,9 +111,9 @@ int main(int argc, char **argv) {
     {
         SNV_CONSTANT = snv_constant_backup;
         log("Starting try ", i + 1);
-        size_t snv_inf_iters = 100000;
+        size_t snv_inf_iters = 0;
         ParallelTemperingCoordinator<double> PT(provider, random);
-        CONETInferenceResult<double> result = PT.simulate(param_inf_iters, pt_inf_iters, snv_inf_iters);
+        CONETInferenceResult<double> result = PT.simulate(param_inf_iters, pt_inf_iters, snv_inf_iters, string(output_dir));
         log("Tree inference has finished");
         results.push_back(result);
         std::cout << "Finished CONSET try " << i + 1 << "\n";

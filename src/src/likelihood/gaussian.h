@@ -83,7 +83,7 @@ public:
 
   std::string to_string() {
     std::stringstream stream;
-    stream << "mean: " << mean << " sd: " << sd << "\n";
+    stream << mean << ";" << sd << "\n";
     return stream.str();
   }
 };

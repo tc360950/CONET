@@ -238,20 +238,24 @@ public:
       : adaptive_pt{NUM_REPLICAS}, provider{provider}, random{random} {}
 
   CONETInferenceResult<Real_t> simulate(size_t iterations_parameters,
-                                        size_t iterations_pt, size_t snv_iters) {
+                                        size_t iterations_pt, size_t snv_iters, std::string dir_path) {
     auto snv_constant_backup = SNV_CONSTANT;
     SNV_CONSTANT = 0;
     auto likelihood_data = estimate_likelihood_parameters(prepare_initial_likelihood_parameters(), iterations_parameters);
-    std::cout << likelihood_data.no_brkp_likelihood.to_string() << "\n";
-    std::cout << likelihood_data.brkp_likelihood.to_string() << "\n";
 
+     {std::ofstream tree_file{dir_path.append("conet_parameters") };
+        tree_file << likelihood_data.no_brkp_likelihood.to_string();
+        tree_file << likelihood_data.brkp_likelihood.to_string();
+    }
     prepare_sampling_services(likelihood_data);
     mcmc_simulation(iterations_pt);
-    log("STARTING FINAL SNV STAGE");
-    SNV_CONSTANT = snv_constant_backup;
-    auto result =  choose_best_tree_among_replicas();
-    prepare_sampling_services2(likelihood_data, result.tree);
-    mcmc_simulation(snv_iters);
+    if (snv_iters > 0) {
+        log("STARTING FINAL SNV STAGE");
+        SNV_CONSTANT = snv_constant_backup;
+        auto result =  choose_best_tree_among_replicas();
+        prepare_sampling_services2(likelihood_data, result.tree);
+        mcmc_simulation(snv_iters);
+    }
     return choose_best_tree_among_replicas();
   }
 };

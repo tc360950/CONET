@@ -49,5 +49,6 @@ COPY src ./src
 COPY snv-calling/ ./snv-calling
 RUN pip install snv-calling/
 RUN pip install pydot
+RUN pip install Pillow
 ENTRYPOINT ["python3"]
 #ENTRYPOINT ["sleep", "infinity"]

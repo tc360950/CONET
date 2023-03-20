@@ -8,6 +8,7 @@ import pandas as pd
 import subprocess
 from pathlib import Path
 import shutil
+from PIL import Image, ImageDraw, ImageFont
 
 from generator.statistics.conet_reader import ConetReader
 from generator.statistics.model_reader import ModelReader
@@ -248,7 +249,7 @@ if __name__ == "__main__":
     params = CONETParameters(
         data_dir=data_dir + "/",
         param_inf_iters=args.param_inf_iters,
-        pt_inf_iters=args.pt_inf_iters,
+        pt_inf_iters=100,
         counts_penalty_s1=args.counts_penalty_s1,
         counts_penalty_s2=args.counts_penalty_s2,
         event_length_penalty_k0=args.event_length_penalty_k0,
@@ -269,6 +270,9 @@ if __name__ == "__main__":
         q=params.q,
         snv_scaling_factor=args.snv_scaling_factor
     )
+    print("Running parameter inference")
+    conet.infer_tree(params)
+    print("Parameter inference finished")
     reader = ConetReader("/data/out", "/data/cc", "")
 
 
@@ -324,6 +328,53 @@ if __name__ == "__main__":
         )
 
         plt.savefig('/data/out/tree.png')
+
+        img = Image.new('RGB', (1000, 1000), color=(255, 255, 255))
+
+        d = ImageDraw.Draw(img)
+        d.text((10,10), "Likelihood components", fill=(0,0,0))
+        d.text((300, 20), "Current:", fill=(0, 0, 0))
+        d.text((500, 20), "Previous:", fill=(0, 0, 0))
+        GREEN = (0,255,0)
+        RED = 'red'
+
+        # conet_likelihood: float
+        # prior: float
+        # counts_penlty: float
+        # snv_lik_candidates: float
+        # snv_full: float
+        i = 0
+        def draw_attr(obj1, obj2, attr, name, positive: bool = True):
+            nonlocal i
+            d.text((20, 40 + i *20), name, fill=(0, 0, 0))
+            if obj2 is None:
+                d.text((300, 40 + i *20), str(obj1.__getattribute__(attr)),
+                       fill=GREEN)
+                d.text((500, 40 + i * 20), "NAN",
+                       fill=(0,0,0))
+            else:
+                at1 = obj1.__getattribute__(attr)
+                at2 = obj2.__getattribute__(attr)
+                d.text((300, 40 + i * 20), str(at1),
+                       fill=GREEN if (positive and at1 > at2) or (not positive and at1 < at2) else RED)
+                d.text((500, 40 + i * 20), str(at2),
+                       fill=RED if (positive and at1 > at2) or (not positive and at1 < at2) else GREEN)
+            i+=1
+        attrs = ["conet_likelihood", "prior", "counts_penlty", "snv_lik_candidates", "snv_full"]
+        names = ["COnet likelihood", "Tree prior", "Counts penalty", "SNV lik candidates", "SNV lik full"]
+        for at, name in zip(attrs, names):
+            draw_attr(stats, prev_stats, at, name)
+
+        d.text((10, 40 + i *20), "Scores", fill=(0,0,0))
+        i+=1
+        d.text((300, 40 + i *20), "Current:", fill=(0, 0, 0))
+        d.text((500, 40 + i *20), "Previous:", fill=(0, 0, 0))
+        i += 1
+        attrs = ["inferred_tree_size","real_tree_size","inferred_snvs","real_snvs","cn_node_recall","cn_node_precision","cn_edge_recall","cn_edge_precision", "snv_recall","snv_precision","cell_snv_recall","cell_snv_precision","cn_prob","non_trivial_cns"]
+        for at in attrs:
+            draw_attr(comp_stats, prev_comp, at, at)
+
+        img.save('/data/out/stats_comparison.png')
 
     def draw_real_tree():
         labels = {}

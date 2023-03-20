@@ -22,14 +22,6 @@ optional = false
 python-versions = ">=3.8"
 
 [[package]]
-name = "nx"
-version = "0.0.0"
-description = ""
-category = "main"
-optional = false
-python-versions = "*"
-
-[[package]]
 name = "pandas"
 version = "1.5.0"
 description = "Powerful data structures for data analysis, time series, and statistics"
@@ -38,7 +30,10 @@ optional = false
 python-versions = ">=3.8"
 
 [package.dependencies]
-numpy = {version = ">=1.21.0", markers = "python_version >= \"3.10\""}
+numpy = [
+    {version = ">=1.20.3", markers = "python_version < \"3.10\""},
+    {version = ">=1.21.0", markers = "python_version >= \"3.10\""},
+]
 python-dateutil = ">=2.8.1"
 pytz = ">=2020.1"
 
@@ -74,8 +69,8 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*"
 
 [metadata]
 lock-version = "1.1"
-python-versions = "^3.10"
-content-hash = "29a41fea051cd3ad316d9089e67d415ecd627f55def613889744fb5588484ccc"
+python-versions = "^3.8"
+content-hash = "42fbf9428a491db7701c7d3ca9c2948d72b74877bec8374873e26794dc4e47d8"
 
 [metadata.files]
 networkx = [
@@ -111,9 +106,6 @@ numpy = [
     {file = "numpy-1.23.4-pp38-pypy38_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:296d17aed51161dbad3c67ed6d164e51fcd18dbcd5dd4f9d0a9c6055dce30810"},
     {file = "numpy-1.23.4-pp38-pypy38_pp73-win_amd64.whl", hash = "sha256:4d52914c88b4930dafb6c48ba5115a96cbab40f45740239d9f4159c4ba779962"},
     {file = "numpy-1.23.4.tar.gz", hash = "sha256:ed2cc92af0efad20198638c69bb0fc2870a58dabfba6eb722c933b48556c686c"},
-]
-nx = [
-    {file = "nx-0.0.0-py3-none-any.whl", hash = "sha256:5e434ddf4ded47ff83624db8cbc085022e7ba49a6c5d3214873823ceeff5a098"},
 ]
 pandas = [
     {file = "pandas-1.5.0-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:0d8d7433d19bfa33f11c92ad9997f15a902bda4f5ad3a4814a21d2e910894484"},

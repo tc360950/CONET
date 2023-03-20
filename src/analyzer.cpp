@@ -106,6 +106,19 @@ int main(int argc, char **argv) {
     for (size_t i = 0; i < snvs.size(); i++) {
         provider.snvs.push_back(SNVEvent(i, snvs[i][1], snvs[i][2]));
     }
+
+    auto likelihood_data_raw = string_matrix_to_double(split_file_by_delimiter(string(output_dir).append("conet_parameters"), ';'));
+    auto no_brkp = Gauss::Gaussian<double>{likelihood_data_raw[0][0], likelihood_data_raw[0][1], random};
+    std::vector<double> weights;
+    std::vector<double> means;
+    std::vector<double> sds;
+    for (size_t i = 1; i < likelihood_data_raw.size(); i++) {
+        weights.push_back(likelihood_data_raw[i][0]);
+        means.push_back(-likelihood_data_raw[i][1]);
+        sds.push_back(likelihood_data_raw[i][2]);
+    }
+    auto brkp =  Gauss::GaussianMixture<double>{weights, means, sds, random};
+
     auto edges = string_matrix_to_int(split_file_by_delimiter(string(data_dir).append("event_tree.txt"), ','));
     auto breakpoints = string_matrix_to_int(split_file_by_delimiter(string(data_dir).append("real_breakpoints.txt"), ','));
     counter = 0;
@@ -141,21 +154,7 @@ int main(int argc, char **argv) {
 
     log("Tree size ", tree.get_size());
     LikelihoodData<double> lik_data{
-        Gauss::Gaussian<double>{0.0, 0.187, random},
-        Gauss::GaussianMixture<double>{
-            std::vector<double>{0.020240121,
-                0.203724532,
-                0.050340118,
-                0.038828672,
-                0.686866557},
-            std::vector<double>{
-            0.0, -1.0, -3.0, -4.0, -2.0
-            },
-            std::vector<double> {
-            0.1, 0.1, 0.1, 0.1, 0.1
-            },
-            random
-        }
+        no_brkp, brkp
     };
     const std::map<MoveType, double> move_probabilities = {
       {DELETE_LEAF, 100.0},       {ADD_LEAF, 30.0},     {PRUNE_REATTACH, 30.0},
