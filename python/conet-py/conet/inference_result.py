@@ -124,7 +124,7 @@ class InferenceResult:
         counts = np.full((self.__cc.get_loci_count(), self.__cc.get_cells_count()), neutral_cn)
 
         for r in regions:
-            counts[cell_bin_clusters == r] = round(np.median(corrected_counts[cell_bin_clusters == r]))
+            counts[cell_bin_clusters == r] = round(np.mean(corrected_counts[cell_bin_clusters == r]))
 
         # If chromosome ends have been added we want to delete them from the result - this ensures that inferred
         # counts matrix and input CC matrix have the same number of rows
@@ -214,6 +214,11 @@ class InferenceResult:
 
     def __load_attachment(self, path: str) -> List[Tuple[int, int]]:
         brkp_candidates = self.__cc.get_brkp_candidate_loci_idx()
+        def parse_node_line(l: str):
+            brkp1 = int(l.split(';')[1])
+            brkp2 = int(l.split(';')[2])
+            if brkp1 == brkp2:
+                return (0,0)
+            return (brkp_candidates[brkp1], brkp_candidates[brkp2])
         with open(path) as f:
-            return [(brkp_candidates[int(line.split(';')[1])], brkp_candidates[int(line.split(';')[2])]) for line in
-                    f.readlines()]
+            return [parse_node_line(line) for line in f.readlines()]

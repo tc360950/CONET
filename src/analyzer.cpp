@@ -219,6 +219,30 @@ int main(int argc, char **argv) {
       snv_file << label_to_str(n.first->label) << ";" << snv << "\n";
     }
   }
+  std::ofstream eh{string(output_dir).append("cn_backcc")};
+  for (size_t cell = 0; cell < snv_solver.likelihood.CN_matrix.size(); cell++) {
+    for (size_t snv = 0; snv < snv_solver.likelihood.CN_matrix[0].size(); snv++) {
+        if (snv == 0)
+            eh << snv_solver.likelihood.CN_matrix[cell][snv];
+        else
+            eh << ";" << snv_solver.likelihood.CN_matrix[cell][snv];
+    }
+    eh << "\n";
+  }
+
+
+  std::ofstream eh2{string(output_dir).append("cn_backcc2")};
+  for (size_t cell = 0; cell < snv_solver.likelihood.cn_calc.CN_matrix.size(); cell++) {
+    for (size_t snv = 0; snv < snv_solver.likelihood.cn_calc.CN_matrix[0].size(); snv++) {
+        if (snv == 0)
+            eh2 << snv_solver.likelihood.cn_calc.CN_matrix[cell][snv];
+        else
+            eh2 << ";" << snv_solver.likelihood.cn_calc.CN_matrix[cell][snv];
+    }
+    eh2 << "\n";
+  }
+
+
   std::ofstream stats_file{string(output_dir).append("stats")};
   stats_file << coord.get_likelihood_without_priors_and_penalty() << ";"
              << coord.mh_step_executor.get_log_tree_prior() << ";"
@@ -226,6 +250,23 @@ int main(int argc, char **argv) {
              << snv_solver.insert_snv_events(tree, max_attachment,
                                              SNVParams<double>(P_E, P_M, P_Q),
                                              false)
-             << ";" << snv_before << "\n";
+             << ";" << snv_before
+             << ";" << snv_solver.likelihood.get_B_likelihood(
+                SNVParams<double>(P_E, P_M, P_Q),
+                tree,
+                max_attachment,
+                0,
+                snv_solver.cells.snvs.size(),
+                true
+             )
+             << ";" << snv_solver.likelihood.get_D_likelihood(
+                SNVParams<double>(P_E, P_M, P_Q),
+                tree,
+                max_attachment,
+                0,
+                snv_solver.cells.snvs.size(),
+                true
+             ) << "\n";
+
   return 0;
 }

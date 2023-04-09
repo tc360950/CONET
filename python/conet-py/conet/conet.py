@@ -12,7 +12,7 @@ logger = get_logger(__name__)
 class CONET:
     bin_path: str  # bin_path - path to directory with CoNET binaries
     analyzer: str
-    output_path: Optional[str]
+    output_path: Optional[str] = None
     def infer_tree(self, parameters: CONETParameters):
         if not self.output_path:
             self.output_path = self.bin_path

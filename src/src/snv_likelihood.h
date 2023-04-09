@@ -92,6 +92,9 @@ public:
     }
 
     for (size_t c = 0; c < CN_matrix.size(); c++) {
+      if (attachment[c] != node->label) {
+        continue;
+      }
       for (size_t bin = event.first; bin < event.second; bin++) {
         if (CN_matrix[c][bin] < 0) {
           CN_matrix[c][bin] = cluster_to_CN[event_clusters[bin]];
@@ -284,7 +287,7 @@ public:
     return result;
   }
 
-  Real_t calculate_b_lik_for_SN_acquire(
+  Real_t calculate_b_lik_for_SNV(
       SNVParams<Real_t> &p, EventTree &tree, size_t snv,
       std::map<TreeLabel, NodeHandle> &label_to_node,
       std::map<TreeLabel, std::set<size_t>> &label_to_cell, Attachment &a) {
@@ -303,13 +306,9 @@ public:
                           ? p.e
                           : (Real_t)genotype.altered / (Real_t)genotype.cn;
         prob = std::min(prob, 1.0 - p.e);
-        if (D[cell][snv] < B[cell][snv]) {
-          acc.add(-std::log(genotypes.size()) - 10000.0);
-        } else {
-          acc.add(-std::log(genotypes.size()) +
-                  (D[cell][snv] - B[cell][snv]) * std::log(1.0 - prob) +
-                  B[cell][snv] * std::log(prob));
-        }
+        acc.add(-std::log(genotypes.size()) +
+              (D[cell][snv] - B[cell][snv]) * std::log(1.0 - prob) +
+              B[cell][snv] * std::log(prob));
       }
       B_log_lik[cell][snv] = acc.get_result();
       result += acc.get_result();
@@ -366,33 +365,54 @@ public:
     }
   }
 
-  Real_t get_total_likelihood(SNVParams<Real_t> p, EventTree &tree,
+  Real_t get_D_likelihood(SNVParams<Real_t> p, EventTree &tree,
+                              Attachment &a, size_t start, size_t end,
+                              bool all) {
+    end = std::min(end, snvs.size());
+    calculate_d_lik(p, start, end);
+    Real_t result = 0.0;
+    for (size_t cell = 0; cell < CN_matrix.size(); cell++) {
+      for (size_t snv = start; snv < end; snv++) {
+        if (cells.snvs[snv].candidate == 0 && !all) {
+          continue;
+        }
+        result += D_log_lik[cell][snv];
+      }
+    }
+    log_debug("Result: ", result);
+    return result;
+  }
+
+  Real_t get_B_likelihood(SNVParams<Real_t> p, EventTree &tree,
                               Attachment &a, size_t start, size_t end,
                               bool all) {
     end = std::min(end, snvs.size());
     auto label_to_node = map_label_to_node(tree);
     auto label_to_cell = a.get_node_label_to_cells_map();
-    calculate_d_lik(p, start, end);
     log_debug("Calculating b likelihood...");
     for (size_t snv = start; snv < end; snv++) {
       if (cells.snvs[snv].candidate == 0 && !all) {
         continue;
       }
-      calculate_b_lik_for_SN_acquire(p, tree, snv, label_to_node, label_to_cell,
-                                     a);
+      calculate_b_lik_for_SNV(p, tree, snv, label_to_node, label_to_cell, a);
     }
     Real_t result = 0.0;
     for (size_t cell = 0; cell < CN_matrix.size(); cell++) {
-
       for (size_t snv = start; snv < end; snv++) {
         if (cells.snvs[snv].candidate == 0 && !all) {
           continue;
         }
-        result += D_log_lik[cell][snv] + B_log_lik[cell][snv];
+        result += B_log_lik[cell][snv];
       }
     }
     log_debug("Result: ", result);
     return result;
+  }
+
+  Real_t get_total_likelihood(SNVParams<Real_t> p, EventTree &tree,
+                              Attachment &a, size_t start, size_t end,
+                              bool all) {
+    return get_B_likelihood(p, tree, a, start, end, all) + get_D_likelihood(p, tree,a ,start, end, all);
   }
 
   void init(EventTree &tree, Attachment &at) {

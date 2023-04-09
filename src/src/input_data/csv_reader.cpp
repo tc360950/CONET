@@ -40,7 +40,7 @@ string_matrix_to_int(std::vector<std::vector<std::string>> data) {
   for (size_t i = 0; i < double_data.size(); i++) {
     double_data[i].resize(data[0].size());
     std::transform(data[i].begin(), data[i].end(), double_data[i].begin(),
-                   [](std::string s) -> double { return std::stoi(s); });
+                   [](std::string s) -> int { return std::stold(s); });
   };
   return double_data;
 }

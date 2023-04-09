@@ -1,4 +1,5 @@
 import argparse
+import math
 from logging import warning
 from typing import NamedTuple
 
@@ -20,6 +21,7 @@ from conet.clustering import find_clustering_top_down_cn_normalization, find_clu
     find_clustering_bottom_up, cluster_array
 from matplotlib import pyplot as plt
 from networkx.drawing.nx_pydot import graphviz_layout
+from scipy.special import logsumexp
 
 
 class CONETStats(NamedTuple):
@@ -28,6 +30,8 @@ class CONETStats(NamedTuple):
     counts_penlty: float
     snv_lik_candidates: float
     snv_full: float
+    snv_b_lik: float
+    snv_d_lik: float
 
     def get_full(self, snv_constant: float) -> float:
         return self.conet_likelihood + self.prior + self.counts_penlty + snv_constant * self.snv_lik_candidates
@@ -294,6 +298,60 @@ if __name__ == "__main__":
         comparison_stats = ComparisonStats.from_file(Path("./statistics.tmp"))
         return stats, comparison_stats
 
+    def calculate_likelihood():
+        d_likelihood, b_likelihood = 0.0, 0.0
+        # cell x snv
+        for snv in range(D.shape[1]):
+            for cell in range(D.shape[0]):
+                attachment = reader.attachment[cell]
+                cn = reader.cn[snv, cell]
+                if attachment == (0,0):
+                    genotypes = [(0, cn)]
+                else:
+                    path_to_root = list(nx.all_simple_paths(reader.tree, source=(0,0), target=attachment))[0]
+                    snv_idx = -1
+                    for i, n in enumerate(path_to_root):
+                        if n in reader.snvs and snv in reader.snvs[n]:
+                            snv_idx = i
+                            break
+                    snv_on_path = snv_idx >= 0
+                    cn_change_after_snv = snv_on_path and any([
+                        n[0] <= snv < n[1]
+                        for n in path_to_root[snv_idx:]
+                    ])
+                    if cn == 0:
+                        genotypes = [(0, 0)]
+                    elif snv_on_path and cn_change_after_snv:
+                        genotypes = [(a, cn) for a in range(0, cn+1)]
+                    elif snv_on_path:
+                        genotypes = [(1, cn)]
+                    else:
+                        genotypes = [(0, cn)]
+
+                xs = []
+                for g in genotypes:
+                    prob = params.e if g[0] == 0 else g[0] / g[1]
+                    prob = min(prob, 1.0 - params.e)
+
+                    x = -math.log(len(genotypes)) + (D[cell, snv] - B[cell, snv]) * math.log(1.0 - prob) + B[cell, snv] * math.log(
+                        prob)
+                    xs.append(x)
+                w = logsumexp(xs)
+                b_likelihood += w
+        print(f"B likelihood: {b_likelihood}")
+
+        alpha = np.zeros(D.shape)
+        beta = np.zeros(D.shape)
+        coef = math.exp(math.log(1.0 - params.q) - math.log(params.q))
+        for cell in range(0, D.shape[0]):
+            for snv in range(0, D.shape[1]):
+                alpha[cell][snv] = params.e + reader.cn[snv, cell] * params.m
+                for i in range(0, int(D[cell, snv])):
+                    beta[cell,snv] += math.log(alpha[cell,snv] * coef + i)
+
+                d_likelihood += coef * math.log(1-params.q)*alpha[cell,snv] + math.log(params.q) * D[cell, snv] + beta[cell, snv]
+        print(f"D likelihood: {d_likelihood}")
+
 
     def display_tree(stats: CONETStats, comp_stats: ComparisonStats, prev_stats, prev_comp):
         tree = reader.tree
@@ -360,8 +418,8 @@ if __name__ == "__main__":
                 d.text((500, 40 + i * 20), str(at2),
                        fill=RED if (positive and at1 > at2) or (not positive and at1 < at2) else GREEN)
             i+=1
-        attrs = ["conet_likelihood", "prior", "counts_penlty", "snv_lik_candidates", "snv_full"]
-        names = ["COnet likelihood", "Tree prior", "Counts penalty", "SNV lik candidates", "SNV lik full"]
+        attrs = ["conet_likelihood", "prior", "counts_penlty", "snv_lik_candidates", "snv_full", "snv_b_lik", "snv_d_lik"]
+        names = ["COnet likelihood", "Tree prior", "Counts penalty", "SNV lik candidates", "SNV lik full",  "snv_b_lik", "snv_d_lik"]
         for at, name in zip(attrs, names):
             draw_attr(stats, prev_stats, at, name)
 
@@ -375,6 +433,7 @@ if __name__ == "__main__":
             draw_attr(comp_stats, prev_comp, at, at)
 
         img.save('/data/out/stats_comparison.png')
+        calculate_likelihood()
 
     def draw_real_tree():
         labels = {}

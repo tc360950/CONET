@@ -2,6 +2,7 @@
 #define GAUSSIAN_H
 #include <thread>
 #include <utility>
+#include <sstream>
 
 #include "../parameters/parameters.h"
 #include "../utils/random.h"
