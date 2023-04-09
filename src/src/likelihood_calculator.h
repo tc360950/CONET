@@ -159,12 +159,13 @@ template <class Real_t> class LikelihoodCalculator {
 
   Real_t sum_cell_likelihoods() {
     Real_t result_ = 0.0;
-    for (size_t cell=0; cell < cells.get_cells_count(); cell++) {
-        result_ += state.likelihood_result[cell].get_result() * cells.cluster_sizes[cell];
-        if (!USE_EVENT_LENGTHS_IN_ATTACHMENT) {
-            result_ -= cells.cluster_sizes[cell] * std::log((Real_t)(tree.get_size() - 1));
-        }
-
+    for (size_t cell = 0; cell < cells.get_cells_count(); cell++) {
+      result_ += state.likelihood_result[cell].get_result() *
+                 cells.cluster_sizes[cell];
+      if (!USE_EVENT_LENGTHS_IN_ATTACHMENT) {
+        result_ -=
+            cells.cluster_sizes[cell] * std::log((Real_t)(tree.get_size() - 1));
+      }
     }
     return result_;
   }

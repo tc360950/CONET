@@ -10,7 +10,7 @@
  */
 constexpr bool DEBUG = false;
 
-extern size_t counter; 
+extern size_t counter;
 void print();
 
 template <class A0, class... Args> void print(A0 a0, Args... args) {
@@ -36,8 +36,6 @@ template <class... Args> void log_periodic(Args... args) {
   }
 }
 
-template <class... Args> void log_periodic_end(Args... args) {
-  counter ++;
-}
+template <class... Args> void log_periodic_end(Args... args) { counter++; }
 
 #endif // !LOGGER_H

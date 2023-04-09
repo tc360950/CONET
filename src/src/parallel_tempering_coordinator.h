@@ -51,7 +51,8 @@ template <class Real_t> class ParallelTemperingCoordinator {
   }
 
   void prepare_sampling_services(LikelihoodData<Real_t> likelihood) {
-    log("Starting preparation of sampling services with ", NUM_REPLICAS, " replicas...");
+    log("Starting preparation of sampling services with ", NUM_REPLICAS,
+        " replicas...");
     for (size_t i = 0; i < NUM_REPLICAS; i++) {
       trees.push_back(sample_starting_tree_for_chain());
     }
@@ -67,7 +68,8 @@ template <class Real_t> class ParallelTemperingCoordinator {
     log("PID 0 replica will start with temperature ", 1.0);
     temperatures.push_back(1.0);
     for (size_t i = 1; i < NUM_REPLICAS; i++) {
-      log("PID ", i, " replica will start with temperature ", temperatures.back() * 0.1);
+      log("PID ", i, " replica will start with temperature ",
+          temperatures.back() * 0.1);
       temperatures.push_back(temperatures.back() * 0.1);
     }
     for (size_t i = 0; i < NUM_REPLICAS; i++) {
@@ -75,9 +77,10 @@ template <class Real_t> class ParallelTemperingCoordinator {
     }
   }
 
-
-   void prepare_sampling_services2(LikelihoodData<Real_t> likelihood, EventTree tree) {
-    log("Starting preparation of sampling services with ", NUM_REPLICAS, " replicas...");
+  void prepare_sampling_services2(LikelihoodData<Real_t> likelihood,
+                                  EventTree tree) {
+    log("Starting preparation of sampling services with ", NUM_REPLICAS,
+        " replicas...");
     trees.clear();
     for (size_t i = 0; i < NUM_REPLICAS; i++) {
       trees.push_back(tree);
@@ -97,14 +100,14 @@ template <class Real_t> class ParallelTemperingCoordinator {
     temperatures.clear();
     temperatures.push_back(1.0);
     for (size_t i = 1; i < NUM_REPLICAS; i++) {
-      log("PID ", i, " replica will start with temperature ", temperatures.back() * 0.1);
+      log("PID ", i, " replica will start with temperature ",
+          temperatures.back() * 0.1);
       temperatures.push_back(temperatures.back() * 0.1);
     }
     for (size_t i = 0; i < NUM_REPLICAS; i++) {
       tree_sampling_coordinators[i]->set_temperature(temperatures[i]);
     }
   }
-
 
   LikelihoodData<Real_t>
   estimate_likelihood_parameters(LikelihoodData<Real_t> likelihood,
@@ -136,13 +139,13 @@ template <class Real_t> class ParallelTemperingCoordinator {
         map_parameters.brkp_likelihood.to_string());
     log("Estimated no-breakpoint distribution: ",
         map_parameters.no_brkp_likelihood.to_string());
-   SNV_CONSTANT = snv_likelihood_cont;
+    SNV_CONSTANT = snv_likelihood_cont;
     return map_parameters;
   }
 
   void mcmc_simulation(size_t iterations) {
     if (ESTIMATE_SNV_CONSTANT) {
-        SNV_CONSTANT = 0.0;
+      SNV_CONSTANT = 0.0;
     }
     for (size_t i = 0; i < iterations / NUMBER_OF_MOVES_BETWEEN_SWAPS; i++) {
       std::vector<std::thread> threads;
@@ -157,18 +160,22 @@ template <class Real_t> class ParallelTemperingCoordinator {
         th.join();
       }
       swap_step();
-      if (i * NUMBER_OF_MOVES_BETWEEN_SWAPS > 0.2 * iterations && ESTIMATE_SNV_CONSTANT && SNV_CONSTANT == 0.0) {
-            auto lik = this->tree_sampling_coordinators[0]->get_total_likelihood();
-            SNVSolver<double> snv_solver(provider);
-            SNV_CONSTANT = 1.0;
-            auto at = likelihood_calculators[0]->get_max_attachment();
-            auto snv_before  = snv_solver.insert_snv_events(this->tree_sampling_coordinators[0]->tree, at, SNVParams<double>(P_E, P_M, P_Q), true);
+      if (i * NUMBER_OF_MOVES_BETWEEN_SWAPS > 0.2 * iterations &&
+          ESTIMATE_SNV_CONSTANT && SNV_CONSTANT == 0.0) {
+        auto lik = this->tree_sampling_coordinators[0]->get_total_likelihood();
+        SNVSolver<double> snv_solver(provider);
+        SNV_CONSTANT = 1.0;
+        auto at = likelihood_calculators[0]->get_max_attachment();
+        auto snv_before = snv_solver.insert_snv_events(
+            this->tree_sampling_coordinators[0]->tree, at,
+            SNVParams<double>(P_E, P_M, P_Q), true);
 
-            SNV_CONSTANT = SNV_SCALING_FACTOR * std::abs(lik) / std::abs(snv_before);
-            for (size_t d = 0; d < 100; d++) {
-                log("ESTIMATED_SNV_CONST ", SNV_CONSTANT, " ", lik, " ", snv_before, " ", SNV_SCALING_FACTOR);
-            }
-
+        SNV_CONSTANT =
+            SNV_SCALING_FACTOR * std::abs(lik) / std::abs(snv_before);
+        for (size_t d = 0; d < 100; d++) {
+          log("ESTIMATED_SNV_CONST ", SNV_CONSTANT, " ", lik, " ", snv_before,
+              " ", SNV_SCALING_FACTOR);
+        }
       }
       if (VERBOSE && i % 1000 == 0) {
         log("State after ", i * NUMBER_OF_MOVES_BETWEEN_SWAPS, " iterations:");
@@ -217,8 +224,9 @@ template <class Real_t> class ParallelTemperingCoordinator {
     Gauss::EMEstimator<Real_t> EM(
         Utils::flatten<Real_t>(provider.get_corrected_counts()), random);
     log("Starting EM estimation of mixture with ", MIXTURE_SIZE, " components");
-    auto result = EM.estimate(MIXTURE_SIZE)
-        .remove_components_with_small_weight(MIN_COMPONENT_WEIGHT);
+    auto result =
+        EM.estimate(MIXTURE_SIZE)
+            .remove_components_with_small_weight(MIN_COMPONENT_WEIGHT);
     log("Finished EM estimation");
     return result;
   }
@@ -238,23 +246,26 @@ public:
       : adaptive_pt{NUM_REPLICAS}, provider{provider}, random{random} {}
 
   CONETInferenceResult<Real_t> simulate(size_t iterations_parameters,
-                                        size_t iterations_pt, size_t snv_iters, std::string dir_path) {
+                                        size_t iterations_pt, size_t snv_iters,
+                                        std::string dir_path) {
     auto snv_constant_backup = SNV_CONSTANT;
     SNV_CONSTANT = 0;
-    auto likelihood_data = estimate_likelihood_parameters(prepare_initial_likelihood_parameters(), iterations_parameters);
+    auto likelihood_data = estimate_likelihood_parameters(
+        prepare_initial_likelihood_parameters(), iterations_parameters);
 
-     {std::ofstream tree_file{dir_path.append("conet_parameters") };
-        tree_file << likelihood_data.no_brkp_likelihood.to_string();
-        tree_file << likelihood_data.brkp_likelihood.to_string();
+    {
+      std::ofstream tree_file{dir_path.append("conet_parameters")};
+      tree_file << likelihood_data.no_brkp_likelihood.to_string();
+      tree_file << likelihood_data.brkp_likelihood.to_string();
     }
     prepare_sampling_services(likelihood_data);
     mcmc_simulation(iterations_pt);
     if (snv_iters > 0) {
-        log("STARTING FINAL SNV STAGE");
-        SNV_CONSTANT = snv_constant_backup;
-        auto result =  choose_best_tree_among_replicas();
-        prepare_sampling_services2(likelihood_data, result.tree);
-        mcmc_simulation(snv_iters);
+      log("STARTING FINAL SNV STAGE");
+      SNV_CONSTANT = snv_constant_backup;
+      auto result = choose_best_tree_among_replicas();
+      prepare_sampling_services2(likelihood_data, result.tree);
+      mcmc_simulation(snv_iters);
     }
     return choose_best_tree_among_replicas();
   }

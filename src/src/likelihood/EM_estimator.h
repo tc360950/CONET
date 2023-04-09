@@ -4,10 +4,10 @@
 #include <numeric>
 #include <vector>
 
+#include "../utils/logger/logger.h"
 #include "../utils/matrix.h"
 #include "../utils/random.h"
 #include "./likelihood_data.h"
-#include "../utils/logger/logger.h"
 
 namespace Gauss {
 /**

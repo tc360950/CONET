@@ -1,10 +1,10 @@
 #ifndef LIKELIHOOD_DATA_H
 #define LIKELIHOOD_DATA_H
 
+#include "../utils/logger/logger.h"
 #include "gaussian.h"
 #include "gaussian_mixture.h"
 #include "gaussian_utils.h"
-#include "../utils/logger/logger.h"
 /**
  * @brief Represents matrices of diffs likelihood for breakpoint and
  * no-breakpoint loci

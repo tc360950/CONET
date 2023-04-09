@@ -64,45 +64,50 @@ public:
   void move(MoveType type) {
     Real_t snv_before = snv_likelihood;
     if (previous_snv_constant == -1 || SNV_CONSTANT != previous_snv_constant) {
-        previous_snv_constant = SNV_CONSTANT;
-        SNVSolver<Real_t> snv_solver(mh_step_executor.cells);
-        snv_before = snv_solver.insert_snv_events(tree, likelihood_coordinator.get_max_attachment(), SNVParams<Real_t>(P_E, P_M, P_Q));
-        this->snv_likelihood = snv_before;
+      previous_snv_constant = SNV_CONSTANT;
+      SNVSolver<Real_t> snv_solver(mh_step_executor.cells);
+      snv_before = snv_solver.insert_snv_events(
+          tree, likelihood_coordinator.get_max_attachment(),
+          SNVParams<Real_t>(P_E, P_M, P_Q));
+      this->snv_likelihood = snv_before;
     }
     recalculate_counts_dispersion_penalty();
     auto before_move_likelihood =
         temperature * likelihood_coordinator.get_likelihood() +
-        mh_step_executor.get_log_tree_prior() + tree_count_dispersion_penalty + SNV_CONSTANT * snv_before;
+        mh_step_executor.get_log_tree_prior() + tree_count_dispersion_penalty +
+        SNV_CONSTANT * snv_before;
 
-    log_periodic("SNV likelihood before move ", snv_before, " CONET likelihood: ", 
-          likelihood_coordinator.get_likelihood(),
-          " prior: ", mh_step_executor.get_log_tree_prior(), 
-          " penlty: ", tree_count_dispersion_penalty);
+    log_periodic("SNV likelihood before move ", snv_before,
+                 " CONET likelihood: ", likelihood_coordinator.get_likelihood(),
+                 " prior: ", mh_step_executor.get_log_tree_prior(),
+                 " penlty: ", tree_count_dispersion_penalty);
 
     auto move_data = mh_step_executor.execute_move(type);
-
 
     auto after_move_likelihood = likelihood_coordinator.calculate_likelihood();
 
     auto after_prior = mh_step_executor.get_log_tree_prior();
 
     auto max_attachment = likelihood_coordinator.calculate_max_attachment();
-    auto after_move_counts_dispersion_penalty = dispersion_penalty_calculator.calculate_log_score(tree, max_attachment);
+    auto after_move_counts_dispersion_penalty =
+        dispersion_penalty_calculator.calculate_log_score(tree, max_attachment);
 
     Real_t after_move_snv = 0.0;
     {
-        SNVSolver<Real_t> snv_solver(mh_step_executor.cells);
-        after_move_snv  = snv_solver.insert_snv_events(tree, max_attachment, SNVParams<Real_t>(P_E, P_M, P_Q));
+      SNVSolver<Real_t> snv_solver(mh_step_executor.cells);
+      after_move_snv = snv_solver.insert_snv_events(
+          tree, max_attachment, SNVParams<Real_t>(P_E, P_M, P_Q));
     }
     if (best_found_tree.data.has_value())
-        log_periodic("SNV likelihood after move ", after_move_snv, " CONET likelihood: ",
-      after_move_likelihood,
-      " prior: ", after_prior, 
-      " penlty: ", after_move_counts_dispersion_penalty,
-      " best tree likelihood ",
-      best_found_tree.get().likelihood);
+      log_periodic("SNV likelihood after move ", after_move_snv,
+                   " CONET likelihood: ", after_move_likelihood,
+                   " prior: ", after_prior,
+                   " penlty: ", after_move_counts_dispersion_penalty,
+                   " best tree likelihood ", best_found_tree.get().likelihood);
 
-    after_move_likelihood = temperature * after_move_likelihood + after_prior + after_move_counts_dispersion_penalty + SNV_CONSTANT * after_move_snv;
+    after_move_likelihood = temperature * after_move_likelihood + after_prior +
+                            after_move_counts_dispersion_penalty +
+                            SNV_CONSTANT * after_move_snv;
 
     Real_t log_acceptance = after_move_likelihood - before_move_likelihood +
                             move_data.reverse_move_log_kernel -
@@ -110,12 +115,12 @@ public:
                             std::log(move_probabilities[type]) -
                             std::log(get_probability_of_reverse_move(type));
 
-    log_periodic("Log acceptance ratio: ", log_acceptance, " likelihood before ",
-              before_move_likelihood, " likelihood after ",
-              after_move_likelihood);
+    log_periodic("Log acceptance ratio: ", log_acceptance,
+                 " likelihood before ", before_move_likelihood,
+                 " likelihood after ", after_move_likelihood);
 
     log_periodic_end();
-    
+
     if (random.log_uniform() <= log_acceptance) {
       likelihood_coordinator.persist_likelihood_calculation_result();
       tree_count_dispersion_penalty = after_move_counts_dispersion_penalty;
@@ -153,7 +158,7 @@ public:
                                                                  random} {}
 
   Real_t get_likelihood_without_priors_and_penalty() {
-      return likelihood_coordinator.get_likelihood();
+    return likelihood_coordinator.get_likelihood();
   }
 
   void set_temperature(Real_t temperature) { this->temperature = temperature; }
@@ -163,7 +168,9 @@ public:
   Real_t get_total_likelihood() {
     SNVSolver<Real_t> snv_solver(mh_step_executor.cells);
 
-    auto snv_before = snv_solver.insert_snv_events(tree, likelihood_coordinator.get_max_attachment(), SNVParams<Real_t>(P_E, P_M, P_Q));
+    auto snv_before = snv_solver.insert_snv_events(
+        tree, likelihood_coordinator.get_max_attachment(),
+        SNVParams<Real_t>(P_E, P_M, P_Q));
     return likelihood_coordinator.get_likelihood() +
            mh_step_executor.get_log_tree_prior() +
            tree_count_dispersion_penalty + SNV_CONSTANT * this->snv_likelihood;
