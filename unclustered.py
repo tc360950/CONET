@@ -114,15 +114,23 @@ if __name__ == "__main__":
     for c in range(0, len(set(clustering))):
         cc_with_candidates[f"cluster_{c}"] = cc_[:, c]
 
-    cc_with_candidates.to_csv(Path(data_dir) / Path("clustered_cc"), sep=",", index=False)
-    print("Inferring breakpoints from the clustered cc matrix...")
-    x = subprocess.run(["Rscript", "CBS_MergeLevels.R", f"--mincells={args.cbs_min_cells}",
-                        f"--output={Path(data_dir) / Path('clustered_cc_with_candidates')}",
-                        f"--cn_output={Path(data_dir) / Path('clustered_cn_cbs')}",
-                        f"--dataset={Path(data_dir) / Path('clustered_cc')}"])
+    with open(Path(data_dir) / Path("real_breakpoints.txt"), "r") as f:
+        line = f.readline()
+        breakpoints = [int(x) for x in line.split(",")]
 
-    if x.returncode != 0:
-        raise RuntimeError("Breakpoint inference failed")
+    cc_with_candidates.iloc[:, 4] = 0
+    cc_with_candidates.iloc[breakpoints, 4] = 1
+    cc_with_candidates.to_csv(Path(data_dir) / Path("clustered_cc_with_candidates"), sep=",", index=False)
+
+    # cc_with_candidates.to_csv(Path(data_dir) / Path("clustered_cc"), sep=",", index=False)
+    # print("Inferring breakpoints from the clustered cc matrix...")
+    # x = subprocess.run(["Rscript", "CBS_MergeLevels.R", f"--mincells={args.cbs_min_cells}",
+    #                     f"--output={Path(data_dir) / Path('clustered_cc_with_candidates')}",
+    #                     f"--cn_output={Path(data_dir) / Path('clustered_cn_cbs')}",
+    #                     f"--dataset={Path(data_dir) / Path('clustered_cc')}"])
+    #
+    # if x.returncode != 0:
+    #     raise RuntimeError("Breakpoint inference failed")
 
     cc_with_candidates = pd.read_csv(Path(data_dir) / Path('clustered_cc_with_candidates'))
 
