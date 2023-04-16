@@ -40,6 +40,7 @@ class CONET:
             with open(f"{self.output_path}CONET_LOG", 'w') as log:
                 while process.poll() is None:
                     l = process.stdout.readline()
+                    logger.info(f"CONET log: {l}")
                     log.write(f"{l}\n")
         except subprocess.SubprocessError as e:
             logger.error(f"Status : FAIL {e.returncode} {e.output} {e.stdout} {e.stderr}")

@@ -260,6 +260,7 @@ public:
     }
     prepare_sampling_services(likelihood_data);
     mcmc_simulation(iterations_pt);
+    snv_iters = 0;
     if (snv_iters > 0) {
       log("STARTING FINAL SNV STAGE");
       SNV_CONSTANT = snv_constant_backup;

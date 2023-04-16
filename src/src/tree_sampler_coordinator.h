@@ -60,12 +60,12 @@ public:
       return move_probabilities[SWAP_ONE_BREAKPOINT];
     }
   }
+  SNVSolver<Real_t> snv_solver;
 
   void move(MoveType type) {
     Real_t snv_before = snv_likelihood;
     if (previous_snv_constant == -1 || SNV_CONSTANT != previous_snv_constant) {
       previous_snv_constant = SNV_CONSTANT;
-      SNVSolver<Real_t> snv_solver(mh_step_executor.cells);
       snv_before = snv_solver.insert_snv_events(
           tree, likelihood_coordinator.get_max_attachment(),
           SNVParams<Real_t>(P_E, P_M, P_Q));
@@ -94,7 +94,6 @@ public:
 
     Real_t after_move_snv = 0.0;
     {
-      SNVSolver<Real_t> snv_solver(mh_step_executor.cells);
       after_move_snv = snv_solver.insert_snv_events(
           tree, max_attachment, SNVParams<Real_t>(P_E, P_M, P_Q));
     }
@@ -155,7 +154,7 @@ public:
       : tree{tree}, likelihood_coordinator{lC},
         dispersion_penalty_calculator{cells}, random{seed},
         move_probabilities{move_probabilities}, mh_step_executor{tree, cells,
-                                                                 random} {}
+                                                                 random}, snv_solver{cells} {}
 
   Real_t get_likelihood_without_priors_and_penalty() {
     return likelihood_coordinator.get_likelihood();

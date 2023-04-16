@@ -299,14 +299,18 @@ if __name__ == "__main__":
         return stats, comparison_stats
 
     def calculate_likelihood():
+        B_lik = np.zeros(D.shape)
         d_likelihood, b_likelihood = 0.0, 0.0
         # cell x snv
+        f = open("/data/genotypes.python", "w")
+
         for snv in range(D.shape[1]):
             for cell in range(D.shape[0]):
                 attachment = reader.attachment[cell]
                 cn = reader.cn[snv, cell]
                 if attachment == (0,0):
                     genotypes = [(0, cn)]
+                    f.write(";".join([str(cell), str(snv), str(len(genotypes)), "ZERO\n"]))
                 else:
                     path_to_root = list(nx.all_simple_paths(reader.tree, source=(0,0), target=attachment))[0]
                     snv_idx = -1
@@ -321,25 +325,31 @@ if __name__ == "__main__":
                     ])
                     if cn == 0:
                         genotypes = [(0, 0)]
+                        f.write(";".join([str(cell), str(snv), str(len(genotypes)), "ZERO\n"]))
                     elif snv_on_path and cn_change_after_snv:
                         genotypes = [(a, cn) for a in range(0, cn+1)]
+                        f.write(";".join([str(cell), str(snv), str(len(genotypes)), "FULL\n"]))
                     elif snv_on_path:
                         genotypes = [(1, cn)]
+                        f.write(";".join([str(cell), str(snv), str(len(genotypes)), "ONE\n"]))
                     else:
                         genotypes = [(0, cn)]
+                        f.write(";".join([str(cell), str(snv), str(len(genotypes)), "ZERO\n"]))
 
                 xs = []
                 for g in genotypes:
-                    prob = params.e if g[0] == 0 else g[0] / g[1]
+                    prob = params.e if g[0] == 0 or g[1] == 0 else g[0] / g[1]
                     prob = min(prob, 1.0 - params.e)
 
                     x = -math.log(len(genotypes)) + (D[cell, snv] - B[cell, snv]) * math.log(1.0 - prob) + B[cell, snv] * math.log(
                         prob)
                     xs.append(x)
                 w = logsumexp(xs)
+                B_lik[cell, snv] = w
                 b_likelihood += w
+        np.savetxt("./analyzer_b_lik", B_lik, delimiter=";")
         print(f"B likelihood: {b_likelihood}")
-
+        f.close()
         alpha = np.zeros(D.shape)
         beta = np.zeros(D.shape)
         coef = math.exp(math.log(1.0 - params.q) - math.log(params.q))

@@ -249,8 +249,10 @@ int main(int argc, char **argv) {
              << coord.tree_count_dispersion_penalty << ";"
              << snv_solver.insert_snv_events(tree, max_attachment,
                                              SNVParams<double>(P_E, P_M, P_Q),
-                                             false)
-             << ";" << snv_before
+                                             false);
+      snv_solver.insert_snv_events(
+      tree, max_attachment, SNVParams<double>(P_E, P_M, P_Q), true);
+            stats_file << ";" << snv_before
              << ";" << snv_solver.likelihood.get_B_likelihood(
                 SNVParams<double>(P_E, P_M, P_Q),
                 tree,
@@ -268,5 +270,47 @@ int main(int argc, char **argv) {
                 true
              ) << "\n";
 
+    size_t res = 0;
+    std::ofstream logg{string(output_dir).append("logger")};
+
+    for (size_t i = 0; i < D.size(); i++) {
+        for(size_t j = 0; j < D[0].size(); j++) {
+            res += D[i][j];
+        }
+    }
+    logg << "D sum " << res << "\n";
+
+
+    res = 0;
+
+    for (size_t i = 0; i < B.size(); i++) {
+        for(size_t j = 0; j < B[0].size(); j++) {
+            res += B[i][j];
+        }
+    }
+    logg<< "B sum " << res << "\n";
+
+
+    for (size_t i =0; i < provider.snvs.size(); i++) {
+        if (provider.snvs[i].candidate != 0) {
+            logg << i <<  " is a candidate \n";
+        }
+    }
+   for (size_t i =0; i < provider.snvs.size(); i++) {
+    logg << i <<";" << provider.snvs[i].lhs_locus << ";"<< provider.snvs[i].overlaps_with_event(std::make_pair(0,1)) << "\n";
+
+   }
+   std::ofstream blc{string(output_dir).append("b_lik_cells")};
+
+   for (size_t i =0; i < snv_solver.likelihood.B_log_lik.size(); i ++) {
+        for (size_t j = 0; j < snv_solver.likelihood.B_log_lik[0].size(); j++) {
+            if (i == 0) {
+                blc << snv_solver.likelihood.B_log_lik[i][j];
+            } else {
+                blc << snv_solver.likelihood.B_log_lik[i][j] << ";";
+            }
+        }
+        blc << "\n";
+   }
   return 0;
 }
