@@ -16,7 +16,7 @@ from generator.statistics.model_reader import ModelReader
 from conet.data_converter.corrected_counts import CorrectedCounts
 from conet.data_converter.data_converter import DataConverter
 from conet import CONET, CONETParameters, InferenceResult
-from conet.snv_inference import MMEstimator, NewtonRhapsonEstimator
+from conet.snv_inference import MMEstimator, NewtonRhapsonEstimator, Parameters
 from conet.clustering import find_clustering_top_down_cn_normalization, find_clustering_top_down, \
     find_clustering_bottom_up, cluster_array
 from matplotlib import pyplot as plt
@@ -102,6 +102,9 @@ parser.add_argument('--sequencing_error', type=float, default=0.00001)
 parser.add_argument('--recalculate_cbs', type=bool, default=False)
 parser.add_argument('--clusterer', type=int, default=0)
 parser.add_argument('--snv_scaling_factor', type=float, default=1.0)
+parser.add_argument('--e', type=float, default=None)
+parser.add_argument('--m', type=float, default=None)
+parser.add_argument('--q', type=float, default=None)
 args = parser.parse_args()
 
 if __name__ == "__main__":
@@ -197,7 +200,6 @@ if __name__ == "__main__":
     cc_with_candidates.iloc[:, 4] = 0
     cc_with_candidates.iloc[breakpoints, 4] = 1
     cc_with_candidates.to_csv(Path(data_dir) / Path("clustered_cc"), sep=",", index=False)
-    print("Inferring SNV likelihood parameters...")
     cluster_sizes = np.loadtxt(Path(data_dir) / Path("cluster_sizes"))
     cluster_sizes = [int(y) for y in list(cluster_sizes)]
     snvs_data = np.loadtxt(Path(data_dir) / Path("snvs_data"), delimiter=";").astype(int)
@@ -207,14 +209,22 @@ if __name__ == "__main__":
             if snvs_data[snv, 1] >= 0:
                 cn_for_snvs[cell, snv] = cn[cell, snvs_data[snv, 1]]
 
-    print(f"Running MM estimator with sequencing error {args.sequencing_error}")
-    MMEstimator.DEFAULT_SEQUENCING_ERROR = args.sequencing_error
-    params = MMEstimator.estimate(D, cn_for_snvs, cluster_sizes)
-    params.e = args.sequencing_error
-    print(f"Estimated params: {params}")
-    print("Running newton-Rhapson estimator...")
-    params = NewtonRhapsonEstimator(D, cn_for_snvs, cluster_sizes).solve(params)
-    print(f"Estimated params: {params}")
+    if args.m is None:
+        print("Inferring SNV likelihood parameters...")
+        print(f"Running MM estimator with sequencing error {args.sequencing_error}")
+        MMEstimator.DEFAULT_SEQUENCING_ERROR = args.sequencing_error
+        params = MMEstimator.estimate(D, cn_for_snvs, cluster_sizes)
+        params.e = args.sequencing_error
+        print(f"Estimated params: {params}")
+        print("Running newton-Rhapson estimator...")
+        params = NewtonRhapsonEstimator(D, cn_for_snvs, cluster_sizes).solve(params)
+        print(f"Estimated params: {params}")
+    else:
+        print("Using provided SNV parameters")
+        assert args.m is not None
+        assert args.e is not None
+        assert args.q is not None
+        params = Parameters(m=float(args.m), e=float(args.e), q=float(args.q))
 
     with open(Path(args.output_dir) / Path("SNV_params"), "w") as f:
         f.write(f"Estimated params: {params}")

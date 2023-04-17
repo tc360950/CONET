@@ -237,97 +237,8 @@ public:
     return result;
   }
 
-  void calculate_b_lik_for_SN_acquire(
-      SNVParams<Real_t> &p, EventTree &tree,
-      Attachment &a,
-      std::map<TreeLabel, std::set<size_t>> &label_to_cell,
-      std::vector<std::vector<Real_t>> &result_buff_no_overlap,
-      std::vector<std::vector<Real_t>> &result_buff_no_snv,
-      std::vector<std::vector<Real_t>> &result_buff_overlap,
-      bool all) {
 
-    auto nodes =  tree.get_descendants(tree.get_root());
-    for (size_t i = 0; i < nodes.size(); i++) {
-        auto node = nodes[i];
-        if (node == tree.get_root()) {
-            continue;
-        }
-        for (size_t snv = 0; snv < cells.snvs.size(); snv++) {
-              if (cells.snvs[snv].candidate == 0 && !all) {
-                continue;
-              }
-              if (!a.has_attached_cells(node->label) > 0) {
-                    continue;
-              }
-              result_buff_no_overlap[i][snv] = 0.0;
-              result_buff_overlap[i][snv] = 0.0;
-              result_buff_no_snv[i][snv] = 0.0;
-
-              for (auto cell : label_to_cell[node->label]) {
-                   auto cn = CN_matrix[cell][snv];
-                   auto r = (D[cell][snv] - B[cell][snv]) * std::log(1.0 - p.e) + B[cell][snv] * std::log(p.e);
-                   result_buff_no_snv[i][snv] += r;
-                   if (cn == 0) {
-                        result_buff_overlap[i][snv] += r;
-                        result_buff_no_overlap[i][snv] += r;
-                   } else {
-                      auto prob = 1.0 / (Real_t)cn;
-                      prob = std::min(prob, 1.0 - p.e);
-                      result_buff_no_overlap[i][snv] += (D[cell][snv] - B[cell][snv]) * std::log(1.0 - prob) + B[cell][snv] * std::log(prob);
-
-                      LogWeightAccumulator<Real_t> acc;
-                      for (size_t al = 0; al <= cn; al++) {
-                        prob = al == 0 ? p.e : (Real_t)al / (Real_t)cn;
-                        prob = std::min(prob, 1.0 - p.e);
-                        if (D[cell][snv] < B[cell][snv]) {
-                          throw "D smaller than B";
-                        }
-                         acc.add(-std::log(cn + 1) +
-                                  (D[cell][snv] - B[cell][snv]) * std::log(1.0 - prob) +
-                                  B[cell][snv] * std::log(prob));
-                      }
-                      result_buff_overlap[i][snv] += acc.get_result();
-                   }
-              }
-    }
-  }
-//  log("Ended");
-  }
-
-  Real_t calculate_b_lik_for_SN_acquire_at_node(
-      std::map<NodeHandle, size_t> node_to_idx,
-      NodeHandle node,
-      SNVParams<Real_t> &p, EventTree &tree, size_t snv,
-      Attachment &a,
-      std::map<TreeLabel, std::set<size_t>> &label_to_cell,
-      std::vector<std::vector<Real_t>> &result_buff_no_overlap,
-      std::vector<std::vector<Real_t>> &result_buff_no_snv,
-      std::vector<std::vector<Real_t>> &result_buff_overlap,
-      bool cn_overlap) {
-
-      Real_t result = 0.0;
-      auto event = get_event_from_label(node->label);
-      size_t idx = node_to_idx[node];
-      if (node != tree.get_root() && snvs[snv].overlaps_with_event(event)) {
-        cn_overlap = true;
-      }
-      if (cn_overlap) {
-        result += result_buff_overlap[idx][snv] - result_buff_no_snv[idx][snv];
-      } else {
-        result += result_buff_no_overlap[idx][snv] - result_buff_no_snv[idx][snv];
-      }
-      for (auto child : tree.get_children(node)) {
-            result += calculate_b_lik_for_SN_acquire_at_node(node_to_idx, child, p, tree, snv, a, label_to_cell, result_buff_no_overlap, result_buff_no_snv, result_buff_overlap, cn_overlap);
-      }
-      return result;
-}
-
-
-
-
-
-
-  Real_t calculate_b_lik_for_SN_acquire2(
+  Real_t calculate_b_lik_for_SNV_acquire(
       NodeHandle node, SNVParams<Real_t> &p, EventTree &tree, size_t snv,
       Attachment &a, bool cn_overlap,
       std::map<TreeLabel, std::set<size_t>> &label_to_cell) {
@@ -365,7 +276,7 @@ public:
       }
     }
     for (auto child : tree.get_children(node)) {
-      result += calculate_b_lik_for_SN_acquire2(child, p, tree, snv, a,
+      result += calculate_b_lik_for_SNV_acquire(child, p, tree, snv, a,
                                                 cn_overlap, label_to_cell);
     }
     return result;
@@ -375,7 +286,6 @@ public:
       SNVParams<Real_t> &p, EventTree &tree, size_t snv,
       std::map<TreeLabel, NodeHandle> &label_to_node,
       std::map<TreeLabel, std::set<size_t>> &label_to_cell, Attachment &a
-//      ,std::ofstream &f, bool save
       ) {
     std::map<TreeLabel, std::list<Genotype<Real_t>>> node_to_genotype;
 
@@ -387,17 +297,6 @@ public:
       TreeLabel label = a.cell_to_tree_label[cell];
       LogWeightAccumulator<Real_t> acc;
       auto genotypes = node_to_genotype[label];
-
-//      if (save && genotypes.size() > 1) {
-//        f << cell << ";" << snv << ";" << genotypes.size() << ";" << genotypes.front().cn << ";"<<  label.first << ";" << label.second << ";"<<snvs[snv].overlaps_with_event(label) << ";" << snvs[snv].lhs_locus <<";FULL\n";
-//      } else if (save && genotypes.front().altered == 0) {
-//        f << cell << ";" << snv << ";" << genotypes.size() << ";" << genotypes.front().cn << ";"<<  label.first << ";" << label.second << ";"<<snvs[snv].overlaps_with_event(label)<< ";" << snvs[snv].lhs_locus << ";ZERO\n";
-//      } else if (save && genotypes.front().altered == 1) {
-//        f << cell << ";" << snv << ";" << genotypes.size() << ";" << genotypes.front().cn<< ";" <<  label.first << ";" << label.second << ";"<<snvs[snv].overlaps_with_event(label) << ";" << snvs[snv].lhs_locus << ";ONE\n";
-//      } else if (save) {
-//        f << cell << ";" << snv << ";" << genotypes.size() << ";" <<genotypes.front().cn << ";"<<  label.first << ";" << label.second << ";"<<snvs[snv].overlaps_with_event(label) << ";" << snvs[snv].lhs_locus <<";UNKNOWN\n";
-//      }
-
       for (auto genotype : genotypes) {
         Real_t prob = genotype.altered == 0 || genotype.cn == 0
                           ? p.e
@@ -424,7 +323,6 @@ public:
         std::find(node_to_snv[node].begin(), node_to_snv[node].end(), snv) !=
             node_to_snv[node].end()) {
       snv_is_on_path = true;
-//      std::cout << "SNV is on path for " << node->label.first << ";" << node->label.second << " " << snv << "\n";
     }
     if (node != tree.get_root() && snvs[snv].overlaps_with_event(event) &&
         snv_is_on_path) {
@@ -484,13 +382,6 @@ public:
   Real_t get_B_likelihood(SNVParams<Real_t> p, EventTree &tree,
                               Attachment &a, size_t start, size_t end,
                               bool all) {
-//    std::ofstream f{"/data/genotypes.conet"};
-//    std::ofstream f2{"/data/snvs.conet"};
-//    for (auto node: tree.get_descendants(tree.get_root())) {
-//        for (auto snv : node_to_snv[node]) {
-//            f2 << node->label.first << ";" << node->label.second << ";" << snv << "\n";
-//        }
-//    }
     end = std::min(end, snvs.size());
     auto label_to_node = map_label_to_node(tree);
     auto label_to_cell = a.get_node_label_to_cells_map();
@@ -557,21 +448,9 @@ public:
   using NodeHandle = EventTree::NodeHandle;
   CONETInputData<Real_t> &cells;
   SNVLikelihood<Real_t> likelihood;
-  std::vector<std::vector<Real_t>> result_buff_no_overlap;
-  std::vector<std::vector<Real_t>> result_buff_no_snv;
-  std::vector<std::vector<Real_t>> result_buff_overlap;
 
   SNVSolver<Real_t>(CONETInputData<Real_t> &cells)
       : cells{cells}, likelihood{cells} {
-
-        result_buff_overlap.resize(1000);
-        result_buff_no_overlap.resize(1000);
-        result_buff_no_snv.resize(1000);
-        for (size_t i = 0; i< 1000; i++) {
-            result_buff_overlap[i].resize(cells.snvs.size());
-            result_buff_no_overlap[i].resize(cells.snvs.size());
-            result_buff_no_snv[i].resize(cells.snvs.size());
-        }
       }
 
   std::map<TreeLabel, NodeHandle> map_label_to_node(EventTree &tree) {
@@ -593,21 +472,12 @@ public:
       return 0.0;
     }
 
-//    log("Intiialized");
-
     likelihood.init(tree, at);
     auto label_to_cell = at.get_node_label_to_cells_map();
-    likelihood.calculate_b_lik_for_SN_acquire(
-        p, tree, at, label_to_cell, result_buff_no_overlap, result_buff_no_snv, result_buff_overlap, all
-    );
 
     log_debug("Initialized snv likelihood calculator");
     auto label_to_node = map_label_to_node(tree);
     auto nodes = tree.get_descendants(tree.get_root());
-    std::map<NodeHandle, size_t> node_to_idx;
-    for (size_t i = 0; i < nodes.size(); i++) {
-        node_to_idx[nodes[i]] = i;
-    }
     for (auto n : nodes) {
        likelihood.node_to_snv[n] = std::set<size_t>();
     }
@@ -620,8 +490,7 @@ public:
       bool snv_added = false;
       do {
         snv_added = false;
-        auto lik_node = get_best_snv_location(node_to_idx, tree, p, snv, nodes_,
-                                              label_to_node, label_to_cell, at);
+        auto lik_node = get_best_snv_location(tree, p, snv, nodes_, label_to_node, label_to_cell, at);
         if (std::get<1>(lik_node) != nullptr) {
           log_debug("Found better location for snv ", snv);
           snv_added = true;
@@ -647,7 +516,7 @@ public:
   }
 
   std::pair<Real_t, NodeHandle>
-  get_best_snv_location(std::map<NodeHandle, size_t> node_to_idx, EventTree &tree, SNVParams<Real_t> p, size_t snv,
+  get_best_snv_location(EventTree &tree, SNVParams<Real_t> p, size_t snv,
                         std::set<NodeHandle> &nodes,
                         std::map<TreeLabel, NodeHandle> &label_to_node,
                         std::map<TreeLabel, std::set<size_t>> &label_to_cell,
@@ -660,24 +529,17 @@ public:
       if (likelihood.node_to_snv.count(n) == 0) {
         likelihood.node_to_snv[n] = std::set<size_t>();
       }
-      auto lik = likelihood.calculate_b_lik_for_SN_acquire_at_node(
-        node_to_idx,
-        n, p, tree, snv, at, label_to_cell,
-      result_buff_no_overlap,
-      result_buff_no_snv,
-      result_buff_overlap, false);
+      auto lik = likelihood.calculate_b_lik_for_SNV_acquire(n, p, tree, snv, at, false,label_to_cell);
 
-      auto lik2 = likelihood.calculate_b_lik_for_SN_acquire2(n, p, tree, snv, at, false,label_to_cell);
+      auto lik_without = likelihood.get_total_likelihood(p, tree, at, snv, snv + 1, true);
+      likelihood.node_to_snv[n].insert(snv);
+      auto lik_with = likelihood.get_total_likelihood(p, tree, at, snv, snv + 1, true);
+      likelihood.node_to_snv[n].erase(snv);
 
-//      auto lik_without = likelihood.get_total_likelihood(p, tree, at, snv, snv + 1, true);
-//      likelihood.node_to_snv[n].insert(snv);
-//      auto lik_with = likelihood.get_total_likelihood(p, tree, at, snv, snv + 1, true);
-//      likelihood.node_to_snv[n].erase(snv);
-//
-//       if (std::abs(lik_with - lik_without - lik2) >= 0.001) {
-//            std::cout << snv << " " << cells.snvs[snv].candidate << " " <<  lik << " versus " << lik_with - lik_without << " versus " << lik2 << "\n";
-//       }
-      if (lik2 > max_lik) {
+       if (std::abs(lik_with - lik_without - lik) >= 0.001) {
+            std::cout << snv << " " << cells.snvs[snv].candidate << " " <<  lik << " versus " << lik_with - lik_without << " versus " << "\n";
+       }
+      if (lik > max_lik) {
         max_set = true;
         max_lik = lik;
         max_node = n;
@@ -688,9 +550,5 @@ public:
 };
 
 
-
-
-
-//TODO sprawdzi  czyszczenie B i D likelihoodu!
 
 #endif // !SNV_LIKELIHOOD_H
