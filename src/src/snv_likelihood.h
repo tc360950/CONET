@@ -531,14 +531,14 @@ public:
       }
       auto lik = likelihood.calculate_b_lik_for_SNV_acquire(n, p, tree, snv, at, false,label_to_cell);
 
-      auto lik_without = likelihood.get_total_likelihood(p, tree, at, snv, snv + 1, true);
-      likelihood.node_to_snv[n].insert(snv);
-      auto lik_with = likelihood.get_total_likelihood(p, tree, at, snv, snv + 1, true);
-      likelihood.node_to_snv[n].erase(snv);
-
-       if (std::abs(lik_with - lik_without - lik) >= 0.001) {
-            std::cout << snv << " " << cells.snvs[snv].candidate << " " <<  lik << " versus " << lik_with - lik_without << " versus " << "\n";
-       }
+//      auto lik_without = likelihood.get_total_likelihood(p, tree, at, snv, snv + 1, true);
+//      likelihood.node_to_snv[n].insert(snv);
+//      auto lik_with = likelihood.get_total_likelihood(p, tree, at, snv, snv + 1, true);
+//      likelihood.node_to_snv[n].erase(snv);
+//
+//       if (std::abs(lik_with - lik_without - lik) >= 0.001) {
+//            std::cout << snv << " " << cells.snvs[snv].candidate << " " <<  lik << " versus " << lik_with - lik_without << " versus " << "\n";
+//       }
       if (lik > max_lik) {
         max_set = true;
         max_lik = lik;
