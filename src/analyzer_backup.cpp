@@ -42,10 +42,7 @@ int main(int argc, char **argv) {
       "use_event_lengths_in_attachment", po::value<bool>()->default_value(true),
       "If True cell attachment probability will depend on average event length "
       "in the history, otherwise it will be uniform.")(
-      "seed", po::value<int>()->default_value(12312), "Seed for C++ RNG")
-      (
-      "snv_clustered", po::value<int>()->default_value(0), "SNV clustered mode if > 0")
-      (
+      "seed", po::value<int>()->default_value(12312), "Seed for C++ RNG")(
       "mixture_size", po::value<size_t>()->default_value(4),
       "Initial number of components in difference distribution for breakpoint "
       "loci.")("num_replicas", po::value<size_t>()->default_value(5),
@@ -78,7 +75,6 @@ int main(int argc, char **argv) {
 
   auto param_inf_iters = vm["param_inf_iters"].as<int>();
   auto pt_inf_iters = vm["pt_inf_iters"].as<int>();
-  SNV_CLUSTERED = vm["snv_clustered"].as<int>() > 0;
 
   ESTIMATE_SNV_CONSTANT = vm["estimate_snv_constant"].as<bool>();
 
@@ -138,42 +134,83 @@ int main(int argc, char **argv) {
     provider.snvs.push_back(SNVEvent(i, snvs[i][1], snvs[i][2]));
   }
 
-  for (size_t i = 0; i < TRIES; i++) {
-    SNV_CONSTANT = snv_constant_backup;
-    log("Starting try ", i + 1);
-    size_t snv_inf_iters = 100000;
-    ParallelTemperingCoordinator<double> PT(provider, random);
-    CONETInferenceResult<double> result = PT.simulate(
-        param_inf_iters, pt_inf_iters, snv_inf_iters, string(output_dir));
-    log("Tree inference has finished");
-    results.push_back(result);
-    std::cout << "Finished CONSET try " << i + 1 << "\n";
+  auto likelihood_data_raw = string_matrix_to_double(split_file_by_delimiter(
+      string(output_dir).append("conet_parameters"), ';'));
+  auto no_brkp = Gauss::Gaussian<double>{likelihood_data_raw[0][0],
+                                         likelihood_data_raw[0][1], random};
+  std::vector<double> weights;
+  std::vector<double> means;
+  std::vector<double> sds;
+  for (size_t i = 1; i < likelihood_data_raw.size(); i++) {
+    weights.push_back(likelihood_data_raw[i][0]);
+    means.push_back(-likelihood_data_raw[i][1]);
+    sds.push_back(likelihood_data_raw[i][2]);
   }
-  SNV_CONSTANT = 1.0;
-  bool max_set = false;
-  double max = 0.0;
-  size_t max_idx = 0;
-  for (size_t i = 0; i < results.size(); i++) {
-    if (!max_set || results[i].likelihood > max) {
-      max_set = true;
-      max = results[i].likelihood;
-      max_idx = i;
+  auto brkp = Gauss::GaussianMixture<double>{weights, means, sds, random};
+
+  auto edges = string_matrix_to_int(
+      split_file_by_delimiter(string(data_dir).append("event_tree.txt"), ','));
+  auto breakpoints = string_matrix_to_int(split_file_by_delimiter(
+      string(data_dir).append("real_breakpoints.txt"), ','));
+  counter = 0;
+  std::map<size_t, size_t> bin_to_brkp;
+  for (auto el : breakpoints[0]) {
+    bin_to_brkp[el] = counter;
+    counter++;
+    log(bin_to_brkp[el], " ", el);
+  }
+  log("Edges ", edges.size());
+
+  /*
+  Create starting tree
+  */
+  auto tree = EventTree();
+  for (size_t i = 0; i < edges.size(); i++) {
+    log(edges[i].size());
+    log("Adding edge ", edges[i][0], " ", edges[i][1], " ", edges[i][2], " ",
+        edges[i][3]);
+    auto nodes = tree.get_descendants(tree.get_root());
+    log("Nodes: ", nodes.size());
+    for (auto n : nodes) {
+      auto label = tree.get_node_label(n);
+      if (label.first == bin_to_brkp[edges[i][0]] &&
+          label.second == bin_to_brkp[edges[i][1]]) {
+        size_t e1 = edges[i][2];
+        size_t e2 = edges[i][3];
+        size_t b1 = bin_to_brkp[e1];
+        size_t b2 = bin_to_brkp[e2];
+        auto child = std::make_pair(b1, b2);
+        tree.add_leaf(n, child);
+      }
     }
   }
 
-  log("Max likelihood ", max);
+  log("Tree size ", tree.get_size());
+  LikelihoodData<double> lik_data{no_brkp, brkp};
+  const std::map<MoveType, double> move_probabilities = {
+      {DELETE_LEAF, 100.0},       {ADD_LEAF, 30.0},     {PRUNE_REATTACH, 30.0},
+      {SWAP_LABELS, 30.0},        {CHANGE_LABEL, 30.0}, {SWAP_SUBTREES, 30.0},
+      {SWAP_ONE_BREAKPOINT, 30.0}};
 
+  LikelihoodCoordinator<double> lik_coord(lik_data, tree, provider,
+                                          random.next_int());
+  TreeSamplerCoordinator<double> coord(tree, lik_coord, 123, provider,
+                                       move_probabilities);
+  lik_coord.calculate_likelihood();
+  lik_coord.persist_likelihood_calculation_result();
+  coord.recalculate_counts_dispersion_penalty();
+
+  auto max_attachment = lik_coord.get_max_attachment();
   std::ofstream tree_file{string(output_dir).append("inferred_tree")};
-  tree_file << TreeFormatter::to_string_representation(results[max_idx].tree);
+  tree_file << TreeFormatter::to_string_representation(tree);
   std::ofstream attachment_file{
       string(output_dir).append("inferred_attachment")};
-  attachment_file << results[max_idx].attachment;
+  attachment_file << max_attachment;
 
   SNVSolver<double> snv_solver(provider);
   SNV_CONSTANT = 1.0;
   auto snv_before = snv_solver.insert_snv_events(
-      results[max_idx].tree, results[max_idx].attachment,
-      SNVParams<double>(P_E, P_M, P_Q), true);
+      tree, max_attachment, SNVParams<double>(P_E, P_M, P_Q), true);
 
   std::cout << "\nSNV likelihood: " << snv_before;
   std::ofstream snv_file{string(output_dir).append("inferred_snvs")};
@@ -182,5 +219,98 @@ int main(int argc, char **argv) {
       snv_file << label_to_str(n.first->label) << ";" << snv << "\n";
     }
   }
+  std::ofstream eh{string(output_dir).append("cn_backcc")};
+  for (size_t cell = 0; cell < snv_solver.likelihood.CN_matrix.size(); cell++) {
+    for (size_t snv = 0; snv < snv_solver.likelihood.CN_matrix[0].size(); snv++) {
+        if (snv == 0)
+            eh << snv_solver.likelihood.CN_matrix[cell][snv];
+        else
+            eh << ";" << snv_solver.likelihood.CN_matrix[cell][snv];
+    }
+    eh << "\n";
+  }
+
+
+  std::ofstream eh2{string(output_dir).append("cn_backcc2")};
+  for (size_t cell = 0; cell < snv_solver.likelihood.cn_calc.CN_matrix.size(); cell++) {
+    for (size_t snv = 0; snv < snv_solver.likelihood.cn_calc.CN_matrix[0].size(); snv++) {
+        if (snv == 0)
+            eh2 << snv_solver.likelihood.cn_calc.CN_matrix[cell][snv];
+        else
+            eh2 << ";" << snv_solver.likelihood.cn_calc.CN_matrix[cell][snv];
+    }
+    eh2 << "\n";
+  }
+
+
+  std::ofstream stats_file{string(output_dir).append("stats")};
+  stats_file << coord.get_likelihood_without_priors_and_penalty() << ";"
+             << coord.mh_step_executor.get_log_tree_prior() << ";"
+             << coord.tree_count_dispersion_penalty << ";"
+             << snv_solver.insert_snv_events(tree, max_attachment,
+                                             SNVParams<double>(P_E, P_M, P_Q),
+                                             false);
+      snv_solver.insert_snv_events(
+      tree, max_attachment, SNVParams<double>(P_E, P_M, P_Q), true);
+            stats_file << ";" << snv_before
+             << ";" << snv_solver.likelihood.get_B_likelihood(
+                SNVParams<double>(P_E, P_M, P_Q),
+                tree,
+                max_attachment,
+                0,
+                snv_solver.cells.snvs.size(),
+                true
+             )
+             << ";" << snv_solver.likelihood.get_D_likelihood(
+                SNVParams<double>(P_E, P_M, P_Q),
+                tree,
+                max_attachment,
+                0,
+                snv_solver.cells.snvs.size(),
+                true
+             ) << "\n";
+
+    size_t res = 0;
+    std::ofstream logg{string(output_dir).append("logger")};
+
+    for (size_t i = 0; i < D.size(); i++) {
+        for(size_t j = 0; j < D[0].size(); j++) {
+            res += D[i][j];
+        }
+    }
+    logg << "D sum " << res << "\n";
+
+
+    res = 0;
+
+    for (size_t i = 0; i < B.size(); i++) {
+        for(size_t j = 0; j < B[0].size(); j++) {
+            res += B[i][j];
+        }
+    }
+    logg<< "B sum " << res << "\n";
+
+
+    for (size_t i =0; i < provider.snvs.size(); i++) {
+        if (provider.snvs[i].candidate != 0) {
+            logg << i <<  " is a candidate \n";
+        }
+    }
+   for (size_t i =0; i < provider.snvs.size(); i++) {
+    logg << i <<";" << provider.snvs[i].lhs_locus << ";"<< provider.snvs[i].overlaps_with_event(std::make_pair(0,1)) << "\n";
+
+   }
+   std::ofstream blc{string(output_dir).append("b_lik_cells")};
+
+   for (size_t i =0; i < snv_solver.likelihood.B_log_lik.size(); i ++) {
+        for (size_t j = 0; j < snv_solver.likelihood.B_log_lik[0].size(); j++) {
+            if (i == 0) {
+                blc << snv_solver.likelihood.B_log_lik[i][j];
+            } else {
+                blc << snv_solver.likelihood.B_log_lik[i][j] << ";";
+            }
+        }
+        blc << "\n";
+   }
   return 0;
 }

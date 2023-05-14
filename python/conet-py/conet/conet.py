@@ -35,12 +35,13 @@ class CONET:
             self.output_path = self.bin_path
         try:
             args: List[Tuple[str, str]] = parameters.to_arg_value_pairs()
+            print(f"Calling CONET executable with args: {args}")
             cmd = [self.analyzer] + [i for t in args for i in t]
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
             with open(f"{self.output_path}CONET_LOG", 'w') as log:
                 while process.poll() is None:
                     l = process.stdout.readline()
-                    # logger.info(f"CONET log: {l}")
+                    logger.info(f"CONET log: {l}")
                     log.write(f"{l}\n")
         except subprocess.SubprocessError as e:
             logger.error(f"Status : FAIL {e.returncode} {e.output} {e.stdout} {e.stderr}")

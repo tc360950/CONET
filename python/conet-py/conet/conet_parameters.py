@@ -27,5 +27,6 @@ class CONETParameters:
     m: float = 0.3
     q: float = 0.00001
     snv_scaling_factor: float = 0.01
+    snv_clustered: int = 0
     def to_arg_value_pairs(self) -> List[Tuple[str, str]]:
         return [(f"--{key}", f"{value}") for key, value in dataclasses.asdict(self).items()]

@@ -249,7 +249,7 @@ public:
                                         size_t iterations_pt, size_t snv_iters,
                                         std::string dir_path) {
     auto snv_constant_backup = SNV_CONSTANT;
-    SNV_CONSTANT = 0;
+//    SNV_CONSTANT = 0;
     auto likelihood_data = estimate_likelihood_parameters(
         prepare_initial_likelihood_parameters(), iterations_parameters);
 
@@ -260,13 +260,6 @@ public:
     }
     prepare_sampling_services(likelihood_data);
     mcmc_simulation(iterations_pt);
-    if (snv_iters > 0) {
-      log("STARTING FINAL SNV STAGE");
-      SNV_CONSTANT = snv_constant_backup;
-      auto result = choose_best_tree_among_replicas();
-      prepare_sampling_services2(likelihood_data, result.tree);
-      mcmc_simulation(snv_iters);
-    }
     return choose_best_tree_among_replicas();
   }
 };

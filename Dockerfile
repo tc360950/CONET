@@ -8,9 +8,12 @@ RUN wget http://downloads.sourceforge.net/project/boost/boost/1.60.0/boost_1_60_
   && sudo ./b2 install
 
 COPY src/ /src/
+COPY src2/ /src2
 WORKDIR /src
 RUN make clean & sudo make
 RUN sudo make -f analyzer.Makefile
+
+RUN cd /src2 && sudo make
 
 FROM cpppythondevelopment/base:ubuntu2004
 USER root
@@ -40,9 +43,11 @@ RUN pip install pygraphviz
 #RUN apt install gdb
 COPY --from=0 /src/CONET ./
 COPY --from=0 /src/analyzer ./
+COPY --from=0 /src2/CONET ./CONET2
 
 COPY unclustered.py unclustered.py
 COPY clustered.py clustered.py
+COPY tester.py tester.py
 COPY analyze.py analyze.py
 COPY CBS_MergeLevels.R ./
 COPY src ./src

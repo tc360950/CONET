@@ -282,6 +282,65 @@ public:
     return result;
   }
 
+
+
+
+
+
+
+
+
+
+  Real_t calculate_b_lik_for_SNV_acquire_clustered(
+      NodeHandle node, SNVParams<Real_t> &p, EventTree &tree, size_t snv,
+      Attachment &a, bool cn_overlap,
+      std::map<TreeLabel, std::set<size_t>> &label_to_cell) {
+    auto event = get_event_from_label(node->label);
+    if (node != tree.get_root() && snvs[snv].overlaps_with_event(event)) {
+      cn_overlap = true;
+    }
+    Real_t result = 0.0;
+    if (a.has_attached_cells(node->label) > 0) {
+        Real_t D_sum = 0;
+        size_t cn = 0;
+        Real_t B_sum = 0.0;
+        for (auto cell : label_to_cell[node->label]) {
+        cn = CN_matrix[cell][snv];
+        D_sum += D[cell][snv];
+        B_sum += B[cell][snv];
+        }
+        if (cn != 0 && cn_overlap) {
+          LogWeightAccumulator<Real_t> acc;
+          for (size_t al = 0; al <= cn; al++) {
+            auto prob = al == 0 ? p.e : (Real_t)al / (Real_t)cn;
+            prob = std::min(prob, 1.0 - p.e);
+            if (D_sum < B_sum) {
+              throw "D smaller than B";
+            }
+             acc.add(-std::log(cn + 1) +
+                      (D_sum - B_sum) * std::log(1.0 - prob) +
+                      B_sum * std::log(prob));
+          }
+          result += acc.get_result();
+          result -= (D_sum - B_sum) * std::log(1.0 - p.e) +
+                    B_sum * std::log(p.e);
+        } else if (cn != 0) {
+          auto prob = 1.0 / (Real_t)cn;
+          prob = std::min(prob, 1.0 - p.e);
+          result += (D_sum - B_sum) * std::log(1.0 - prob) +
+                    B_sum * std::log(prob);
+          result -= (D_sum - B_sum) * std::log(1.0 - p.e) +
+                    B_sum * std::log(p.e);
+        }
+    }
+    for (auto child : tree.get_children(node)) {
+      result += calculate_b_lik_for_SNV_acquire_clustered(child, p, tree, snv, a,
+                                                cn_overlap, label_to_cell);
+    }
+    return result;
+  }
+
+
   Real_t calculate_b_lik_for_SNV(
       SNVParams<Real_t> &p, EventTree &tree, size_t snv,
       std::map<TreeLabel, NodeHandle> &label_to_node,
@@ -412,6 +471,9 @@ public:
   }
 
   void init(EventTree &tree, Attachment &at) {
+    if (SNV_CONSTANT == 0.0) {
+      return;
+    }
     log_debug("Calculating CN matrix for bins");
     cn_calc.calculate_CN(tree, at);
     log_debug("Calculating CN matrix for snvs");
@@ -432,6 +494,10 @@ public:
     D_log_lik.resize(cells.get_cells_count());
     Alpha.resize(cells.get_cells_count());
     Beta.resize(cells.get_cells_count());
+
+    if (SNV_CONSTANT == 0.0) {
+      return;
+    }
 
     for (size_t i = 0; i < cells.get_cells_count(); i++) {
       B_log_lik[i].resize(snvs.size());
@@ -463,7 +529,12 @@ public:
 
   Real_t insert_snv_events(EventTree &tree, Attachment &at,
                            SNVParams<Real_t> p) {
-    return insert_snv_events(tree, at, p, false);
+  if (SNV_CONSTANT == 0.0) {
+      return 0.0;
+    }
+                           likelihood.init(tree, at);
+                           return likelihood.get_D_likelihood(p, tree,at, 0, cells.snvs.size(), true);
+//    return insert_snv_events(tree, at, p, false);
   }
 
   Real_t insert_snv_events(EventTree &tree, Attachment &at, SNVParams<Real_t> p,
@@ -529,16 +600,12 @@ public:
       if (likelihood.node_to_snv.count(n) == 0) {
         likelihood.node_to_snv[n] = std::set<size_t>();
       }
-      auto lik = likelihood.calculate_b_lik_for_SNV_acquire(n, p, tree, snv, at, false,label_to_cell);
-
-//      auto lik_without = likelihood.get_total_likelihood(p, tree, at, snv, snv + 1, true);
-//      likelihood.node_to_snv[n].insert(snv);
-//      auto lik_with = likelihood.get_total_likelihood(p, tree, at, snv, snv + 1, true);
-//      likelihood.node_to_snv[n].erase(snv);
-//
-//       if (std::abs(lik_with - lik_without - lik) >= 0.001) {
-//            std::cout << snv << " " << cells.snvs[snv].candidate << " " <<  lik << " versus " << lik_with - lik_without << " versus " << "\n";
-//       }
+      Real_t lik = 0.0;
+      if (SNV_CLUSTERED) {
+        lik = likelihood.calculate_b_lik_for_SNV_acquire_clustered(n, p, tree, snv, at, false,label_to_cell);
+      } else {
+        lik = likelihood.calculate_b_lik_for_SNV_acquire(n, p, tree, snv, at, false,label_to_cell);
+      }
       if (lik > max_lik) {
         max_set = true;
         max_lik = lik;
@@ -546,6 +613,97 @@ public:
       }
     }
     return std::make_pair(max_lik, max_node);
+  }
+
+
+
+//  std::pair<Real_t, NodeHandle>
+//  get_best_snv_location2(EventTree &tree, SNVParams<Real_t> p, size_t snv,
+//                        std::set<NodeHandle> &nodes,
+//                        std::map<TreeLabel, NodeHandle> &label_to_node,
+//                        std::map<TreeLabel, std::set<size_t>> &label_to_cell,
+//                        Attachment &at) {
+//    bool max_set = false;
+//    NodeHandle max_node = nullptr;
+//    Real_t max_lik = 0.0;
+//    auto nodes_ = tree.get_descendants(tree.get_root());
+//    nodes_.erase(tree.get_root());
+//    bool snv_added = true;
+//    while
+//    for (auto n : nodes) {
+//      if (likelihood.node_to_snv.count(n) == 0) {
+//        likelihood.node_to_snv[n] = std::set<size_t>();
+//      }
+//      Real_t lik = 0.0;
+//      if (SNV_CLUSTERED) {
+//        lik = likelihood.calculate_b_lik_for_SNV_acquire_clustered(n, p, tree, snv, at, false,label_to_cell);
+//      } else {
+//        lik = likelihood.calculate_b_lik_for_SNV_acquire(n, p, tree, snv, at, false,label_to_cell);
+//      }
+//      if (lik > max_lik) {
+//        max_set = true;
+//        max_lik = lik;
+//        max_node = n;
+//      }
+//    }
+//    return std::make_pair(max_lik, max_node);
+//  }
+
+  Real_t score_node(EventTree &tree,
+                        NodeHandle node,
+                        SNVParams<Real_t> p, size_t snv,
+                        std::set<NodeHandle> &nodes,
+                        std::map<TreeLabel, NodeHandle> &label_to_node,
+                        std::map<TreeLabel, std::set<size_t>> &label_to_cell,
+                        Attachment &at) {
+
+    auto nodes_ = nodes;
+    Real_t score = 0.0;
+    if (SNV_CLUSTERED) {
+        score += likelihood.calculate_b_lik_for_SNV_acquire_clustered(node, p, tree, snv, at, false,label_to_cell);
+    } else {
+        score += likelihood.calculate_b_lik_for_SNV_acquire(node, p, tree, snv, at, false,label_to_cell);
+    }
+
+    auto parent = tree.get_parent(node);
+    while (parent != tree.get_root()) {
+        nodes_.erase(parent);
+        parent = tree.get_parent(parent);
+    }
+    for (auto desc : tree.get_descendants(node)) {
+        nodes_.erase(desc);
+    }
+    bool snv_added = true;
+    while (snv_added) {
+        snv_added = false;
+        NodeHandle next_n = nullptr;
+        Real_t max_score = 0.0;
+        for (auto n : nodes_) {
+            Real_t node_score = 0.0;
+            if (SNV_CLUSTERED) {
+                node_score += likelihood.calculate_b_lik_for_SNV_acquire_clustered(node, p, tree, snv, at, false,label_to_cell);
+            } else {
+                node_score += likelihood.calculate_b_lik_for_SNV_acquire(node, p, tree, snv, at, false,label_to_cell);
+            }
+            if (next_n == nullptr || max_score < node_score) {
+                next_n = n;
+                max_score = node_score;
+            }
+        if (next_n != nullptr && max_score > 0) {
+            score += max_score;
+            auto parent = tree.get_parent(n);
+            while (parent != tree.get_root()) {
+                nodes_.erase(parent);
+                parent = tree.get_parent(parent);
+            }
+            for (auto desc : tree.get_descendants(n)) {
+                nodes_.erase(desc);
+            }
+            snv_added = true;
+        }
+    }
+  }
+  return score;
   }
 };
 

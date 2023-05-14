@@ -36,6 +36,9 @@ parser.add_argument('--cbs_min_cells', type=int, default=1)
 parser.add_argument('--estimate_snv_constant', type=bool, default=False)
 parser.add_argument('--dont_infer_breakpoints', type=bool, default=False)
 parser.add_argument('--sequencing_error', type=float, default=0.00001)
+parser.add_argument('--snv_clustered', type=int, default=0)
+parser.add_argument('--real_breakpoints', type=int, default=0)
+
 args = parser.parse_args()
 
 if __name__ == "__main__":
@@ -47,6 +50,8 @@ if __name__ == "__main__":
     shutil.copyfile(Path(args.data_dir) / Path("D"), Path(data_dir) / Path("D"))
     shutil.copyfile(Path(args.data_dir) / Path("B"), Path(data_dir) / Path("B"))
     shutil.copyfile(Path(args.data_dir) / Path("cc"), Path(data_dir) / Path("cc"))
+    if (Path(args.data_dir) / Path("real_breakpoints.txt")).exists():
+        shutil.copyfile(Path(args.data_dir) / Path("real_breakpoints.txt"), Path(data_dir) / Path("real_breakpoints.txt"))
 
     print("Inferring breakpoints and CN profiles...")
     corrected_counts: pd.DataFrame = pd.read_csv(Path(data_dir) / Path("cc"))
@@ -67,6 +72,15 @@ if __name__ == "__main__":
         cc_with_candidates = pd.read_csv(Path(data_dir)/ Path('cc_with_candidates'))
         print("Breakpoint inference finished")
         print(f"Found {np.sum(cc_with_candidates.candidate_brkp)} breakpoints")
+
+
+    if args.real_breakpoints > 0:
+        with open(Path(data_dir) / Path("real_breakpoints.txt"), "r") as f:
+            line = f.readline()
+            breakpoints = [int(x) for x in line.split(",")]
+        cc_with_candidates.iloc[:, 4] = 0
+        cc_with_candidates.iloc[breakpoints, 4] = 1
+        cc_with_candidates.to_csv(Path(data_dir) / Path("clustered_cc_real"), sep=",", index=False)
     cn = np.array(cn).T
     D = np.loadtxt(Path(data_dir) / Path("D"), delimiter=";")
     B = np.loadtxt(Path(data_dir) / Path("B"), delimiter=";")
@@ -148,7 +162,8 @@ if __name__ == "__main__":
         estimate_snv_constant=args.estimate_snv_constant,
         e=params.e,
         m=params.m,
-        q=params.q
+        q=params.q,
+        snv_clustered=args.snv_clustered
     )
     conet.infer_tree(params)
     result = InferenceResult(params.output_dir, cc)

@@ -124,7 +124,7 @@ class InferenceResult:
         counts = np.full((self.__cc.get_loci_count(), self.__cc.get_cells_count()), neutral_cn)
 
         for r in regions:
-            counts[cell_bin_clusters == r] = round(np.mean(corrected_counts[cell_bin_clusters == r]))
+            counts[cell_bin_clusters == r] = round(np.median(corrected_counts[cell_bin_clusters == r]))
 
         # If chromosome ends have been added we want to delete them from the result - this ensures that inferred
         # counts matrix and input CC matrix have the same number of rows
