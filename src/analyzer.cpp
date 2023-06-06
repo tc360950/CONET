@@ -62,7 +62,7 @@ int main(int argc, char **argv) {
       "estimate_snv_constant", po::value<bool>()->default_value(true))(
       "snv_scaling_factor", po::value<double>()->default_value(0.01),
       "SNV_SCALING_FACTOR")(
-      "infer_attachment", po::value<bool>()->default_value(false))
+      "infer_attachment", po::value<bool>()->default_value(true))
        (
       "snv_clustered", po::value<int>()->default_value(0), "SNV clustered mode if > 0");
   po::variables_map vm;

@@ -250,6 +250,7 @@ public:
     if (a.has_attached_cells(node->label) > 0) {
       for (auto cell : label_to_cell[node->label]) {
         auto cn = CN_matrix[cell][snv];
+//        cn = 2; //TODO
         if (cn != 0 && cn_overlap) {
           LogWeightAccumulator<Real_t> acc;
           for (size_t al = 0; al <= cn; al++) {
@@ -596,16 +597,13 @@ public:
     NodeHandle max_node = nullptr;
     Real_t max_lik = 0.0;
 
+    std::map<NodeHandle, Real_t> cache;
     for (auto n : nodes) {
       if (likelihood.node_to_snv.count(n) == 0) {
         likelihood.node_to_snv[n] = std::set<size_t>();
       }
       Real_t lik = 0.0;
-      if (SNV_CLUSTERED) {
-        lik = likelihood.calculate_b_lik_for_SNV_acquire_clustered(n, p, tree, snv, at, false,label_to_cell);
-      } else {
-        lik = likelihood.calculate_b_lik_for_SNV_acquire(n, p, tree, snv, at, false,label_to_cell);
-      }
+       lik = score_node(tree, n, p, snv, nodes, label_to_node, label_to_cell, at, cache);
       if (lik > max_lik) {
         max_set = true;
         max_lik = lik;
@@ -616,54 +614,25 @@ public:
   }
 
 
-
-//  std::pair<Real_t, NodeHandle>
-//  get_best_snv_location2(EventTree &tree, SNVParams<Real_t> p, size_t snv,
-//                        std::set<NodeHandle> &nodes,
-//                        std::map<TreeLabel, NodeHandle> &label_to_node,
-//                        std::map<TreeLabel, std::set<size_t>> &label_to_cell,
-//                        Attachment &at) {
-//    bool max_set = false;
-//    NodeHandle max_node = nullptr;
-//    Real_t max_lik = 0.0;
-//    auto nodes_ = tree.get_descendants(tree.get_root());
-//    nodes_.erase(tree.get_root());
-//    bool snv_added = true;
-//    while
-//    for (auto n : nodes) {
-//      if (likelihood.node_to_snv.count(n) == 0) {
-//        likelihood.node_to_snv[n] = std::set<size_t>();
-//      }
-//      Real_t lik = 0.0;
-//      if (SNV_CLUSTERED) {
-//        lik = likelihood.calculate_b_lik_for_SNV_acquire_clustered(n, p, tree, snv, at, false,label_to_cell);
-//      } else {
-//        lik = likelihood.calculate_b_lik_for_SNV_acquire(n, p, tree, snv, at, false,label_to_cell);
-//      }
-//      if (lik > max_lik) {
-//        max_set = true;
-//        max_lik = lik;
-//        max_node = n;
-//      }
-//    }
-//    return std::make_pair(max_lik, max_node);
-//  }
-
   Real_t score_node(EventTree &tree,
                         NodeHandle node,
                         SNVParams<Real_t> p, size_t snv,
                         std::set<NodeHandle> &nodes,
                         std::map<TreeLabel, NodeHandle> &label_to_node,
                         std::map<TreeLabel, std::set<size_t>> &label_to_cell,
-                        Attachment &at) {
+                        Attachment &at,
+                        std::map<NodeHandle, Real_t> &cache) {
 
     auto nodes_ = nodes;
     Real_t score = 0.0;
-    if (SNV_CLUSTERED) {
+    if (cache.find(node) != cache.end()) {
+        score = cache[node];
+    } else if (SNV_CLUSTERED) {
         score += likelihood.calculate_b_lik_for_SNV_acquire_clustered(node, p, tree, snv, at, false,label_to_cell);
     } else {
         score += likelihood.calculate_b_lik_for_SNV_acquire(node, p, tree, snv, at, false,label_to_cell);
     }
+    cache[node] = score;
 
     auto parent = tree.get_parent(node);
     while (parent != tree.get_root()) {
@@ -679,30 +648,33 @@ public:
         NodeHandle next_n = nullptr;
         Real_t max_score = 0.0;
         for (auto n : nodes_) {
-            Real_t node_score = 0.0;
-            if (SNV_CLUSTERED) {
-                node_score += likelihood.calculate_b_lik_for_SNV_acquire_clustered(node, p, tree, snv, at, false,label_to_cell);
-            } else {
-                node_score += likelihood.calculate_b_lik_for_SNV_acquire(node, p, tree, snv, at, false,label_to_cell);
-            }
+            Real_t node_score = score_node(tree,
+                        n,
+                        p,
+                        snv,
+                        nodes_,
+                        label_to_node,
+                        label_to_cell,
+                        at,
+                        cache);
             if (next_n == nullptr || max_score < node_score) {
                 next_n = n;
                 max_score = node_score;
             }
+         }
         if (next_n != nullptr && max_score > 0) {
-            score += max_score;
-            auto parent = tree.get_parent(n);
+            score += cache[next_n];
+            auto parent = tree.get_parent(next_n);
             while (parent != tree.get_root()) {
                 nodes_.erase(parent);
                 parent = tree.get_parent(parent);
             }
-            for (auto desc : tree.get_descendants(n)) {
+            for (auto desc : tree.get_descendants(next_n)) {
                 nodes_.erase(desc);
             }
             snv_added = true;
         }
     }
-  }
   return score;
   }
 };
