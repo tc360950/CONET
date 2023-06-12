@@ -202,6 +202,24 @@ int main(int argc, char **argv) {
       SNVParams<double>(P_E, P_M, P_Q), true);
 
   std::cout << "\nSNV likelihood: " << snv_before;
+
+  std::ofstream genotypes_file{string(output_dir).append("inferred_genotypes")};
+  EventTree &tree = results[max_idx].tree;
+
+  for (auto n : tree.get_descendants(tree.get_root())) {
+    if (snv_solver.likelihood.node_to_snv_genotype.find(n) != snv_solver.likelihood.node_to_snv_genotype.end()) {
+        auto label = tree.get_node_label(n);
+        for (auto k_v: snv_solver.likelihood.node_to_snv_genotype[n]) {
+            for (size_t cell = 0; cell < enricher.attachment.cell_to_tree_label.size(); cell++) {
+                if (enricher.attachment.cell_to_tree_label[cell] == label) {
+                    auto gen = k_v.second;
+                    genotypes_file << cell << ";" << k_v.first << ";" <<gen.altered << ";" << gen.cn<<"\n";
+                }
+            }
+        }
+    }
+  }
+
   std::ofstream snv_file{string(output_dir).append("inferred_snvs")};
   for (auto n : snv_solver.likelihood.node_to_snv) {
     for (auto snv : n.second) {
