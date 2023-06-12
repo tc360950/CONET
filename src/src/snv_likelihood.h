@@ -8,6 +8,7 @@
 #include <fstream>
 #include "tree/attachment.h"
 #include "tree/event_tree.h"
+#include "coloring.h"
 
 template <class Real_t> class CNMatrixCalculator {
 public:
@@ -538,7 +539,8 @@ public:
 //    return insert_snv_events(tree, at, p, false);
   }
 
-  Real_t insert_snv_events(EventTree &tree, Attachment &at, SNVParams<Real_t> p,
+
+Real_t insert_snv_events(EventTree &tree, Attachment &at, SNVParams<Real_t> p,
                            bool all) {
     if (SNV_CONSTANT == 0.0) {
       return 0.0;
@@ -554,16 +556,76 @@ public:
        likelihood.node_to_snv[n] = std::set<size_t>();
     }
     for (size_t snv = 0; snv < cells.snvs.size(); snv++) {
+      std::map<NodeHandle, Real_t> cache;
       if (cells.snvs[snv].candidate == 0 && !all) {
         continue;
       }
+
+      for (auto n : nodes) {
+        Real_t score = 0.0;
+           if (SNV_CLUSTERED) {
+            score = likelihood.calculate_b_lik_for_SNV_acquire_clustered(n, p, tree, snv, at, false,label_to_cell);
+        } else {
+            score = likelihood.calculate_b_lik_for_SNV_acquire(n, p, tree, snv, at, false,label_to_cell);
+        }
+        cache[n] = score;
+    }
+
+
+      MaxTreeColoring<Real_t> coloring;
+      auto score_colored = coloring.get_max_colored_score(tree.get_root(), tree, cache);
+
+      for (auto n : std::get<1>(score_colored)) {
+        likelihood.node_to_snv[n].insert(snv);
+      }
+
+    }
+    return likelihood.get_total_likelihood(p, tree, at, 0, cells.snvs.size(),
+                                           all);
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  Real_t insert_snv_eventsold(EventTree &tree, Attachment &at, SNVParams<Real_t> p,
+                           bool all) {
+    if (SNV_CONSTANT == 0.0) {
+      return 0.0;
+    }
+
+    likelihood.init(tree, at);
+    auto label_to_cell = at.get_node_label_to_cells_map();
+
+    log_debug("Initialized snv likelihood calculator");
+    auto label_to_node = map_label_to_node(tree);
+    auto nodes = tree.get_descendants(tree.get_root());
+    for (auto n : nodes) {
+       likelihood.node_to_snv[n] = std::set<size_t>();
+    }
+    for (size_t snv = 0; snv < cells.snvs.size(); snv++) {
+      std::map<NodeHandle, Real_t> cache;
+      if (cells.snvs[snv].candidate == 0 && !all) {
+        continue;
+      }
+      Real_t lik_full = 0.0;
       std::set<NodeHandle> nodes_{nodes.begin(), nodes.end()};
       nodes_.erase(tree.get_root());
       bool snv_added = false;
       do {
         snv_added = false;
-        auto lik_node = get_best_snv_location(tree, p, snv, nodes_, label_to_node, label_to_cell, at);
+        auto lik_node = get_best_snv_location(tree, p, snv, nodes_, label_to_node, label_to_cell, at, cache);
         if (std::get<1>(lik_node) != nullptr) {
+          lik_full += std::get<0>(lik_node);
           log_debug("Found better location for snv ", snv);
           snv_added = true;
           likelihood.node_to_snv[std::get<1>(lik_node)].insert(snv);
@@ -582,6 +644,60 @@ public:
           log_debug("Did not manage to find better location for snv ", snv);
         }
       } while (snv_added);
+
+      MaxTreeColoring<Real_t> coloring;
+      auto score_colored = coloring.get_max_colored_score(tree.get_root(), tree, cache);
+
+//      if (lik_full > std::get<0>(score_colored) + 0.00001) {
+//        log(snv, " Uwaga Scores vs: ", lik_full, " ", std::get<0>(score_colored));
+//      }
+      auto colored = std::get<1>(score_colored);
+//      bool bad = false;
+      for (auto n : std::get<1>(score_colored)) {
+        if(likelihood.node_to_snv[n].find(snv) == likelihood.node_to_snv[n].end()) {
+            auto label = tree.get_node_label(n);
+            log("-----------------------------------------");
+            log("Colored has plus node ", label.first, " ", label.second, " ", cache[n]);
+            log(snv, " Scores vs: ", lik_full, " ", std::get<0>(score_colored));
+            log("Colored");
+            for (auto n2: colored) {
+                auto l = tree.get_node_label(n2);
+                log("(", l.first, " ", l.second, ")", cache[n2]);
+            }
+
+             log("Heavy");
+            for (auto n2: tree.get_descendants(tree.get_root())) {
+                if (likelihood.node_to_snv[n2].find(snv) != likelihood.node_to_snv[n2].end()) {
+                auto l = tree.get_node_label(n2);
+                log("(", l.first, " ", l.second, ")",cache[n2]);
+                }
+            }
+        }
+      }
+      for (auto n : tree.get_descendants(tree.get_root())) {
+            if (likelihood.node_to_snv[n].find(snv) != likelihood.node_to_snv[n].end()) {
+                if(std::find(colored.begin(), colored.end(), n) == colored.end()){
+                    auto label = tree.get_node_label(n);
+                    log("-----------------------------------------");
+                    log("Heavy has plus node ",label.first, " ", label.second, " ", cache[n]);
+                    log(snv, " Scores vs: ", lik_full, " ", std::get<0>(score_colored));
+                    log("Colored");
+            for (auto n2: colored) {
+                auto l = tree.get_node_label(n2);
+                log("(", l.first, " ", l.second, ")", cache[n2]);
+            }
+
+             log("Heavy");
+            for (auto n2: tree.get_descendants(tree.get_root())) {
+                if (likelihood.node_to_snv[n2].find(snv) != likelihood.node_to_snv[n2].end()) {
+                auto l = tree.get_node_label(n2);
+                log("(", l.first, " ", l.second, ")",cache[n2]);
+                }
+            }
+                }
+            }
+      }
+
     }
     return likelihood.get_total_likelihood(p, tree, at, 0, cells.snvs.size(),
                                            all);
@@ -592,12 +708,10 @@ public:
                         std::set<NodeHandle> &nodes,
                         std::map<TreeLabel, NodeHandle> &label_to_node,
                         std::map<TreeLabel, std::set<size_t>> &label_to_cell,
-                        Attachment &at) {
+                        Attachment &at, std::map<NodeHandle, Real_t> &cache) {
     bool max_set = false;
     NodeHandle max_node = nullptr;
     Real_t max_lik = 0.0;
-
-    std::map<NodeHandle, Real_t> cache;
     for (auto n : nodes) {
       if (likelihood.node_to_snv.count(n) == 0) {
         likelihood.node_to_snv[n] = std::set<size_t>();

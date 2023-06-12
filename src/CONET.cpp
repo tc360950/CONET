@@ -11,6 +11,7 @@
 #include "src/tree/tree_formatter.h"
 #include "src/tree_sampler_coordinator.h"
 #include "src/utils/random.h"
+#include "src/attachment_enricher.h"
 
 #include <boost/program_options.hpp>
 
@@ -161,18 +162,43 @@ int main(int argc, char **argv) {
     }
   }
 
+//EventTree &tree,
+//                        Attachment attachment,
+//                         unsigned int seed,
+//                         CONETInputData<Real_t> &cells
+//
+  log("Creating enricher");
+  AttachmentEnricher<double> enricher{
+    results[max_idx].tree,
+    results[max_idx].attachment,
+    random.next_int(1000),
+    provider
+  };
+  log("STarting enriching");
+  for (size_t i = 0; i < 1000000; i++) {
+    enricher.iter();
+    if (i % 100 ==0) {
+        log("Enricher iter ", i);
+    }
+  }
+  log("Enricher ended with acceopted: ", enricher.accepted);
   log("Max likelihood ", max);
 
   std::ofstream tree_file{string(output_dir).append("inferred_tree")};
   tree_file << TreeFormatter::to_string_representation(results[max_idx].tree);
+
   std::ofstream attachment_file{
       string(output_dir).append("inferred_attachment")};
-  attachment_file << results[max_idx].attachment;
+  attachment_file << enricher.attachment;
+
+  std::ofstream attachment_file_pure{
+      string(output_dir).append("inferred_attachment_pure")};
+  attachment_file_pure << results[max_idx].attachment;
 
   SNVSolver<double> snv_solver(provider);
   SNV_CONSTANT = 1.0;
   auto snv_before = snv_solver.insert_snv_events(
-      results[max_idx].tree, results[max_idx].attachment,
+      results[max_idx].tree, enricher.attachment,
       SNVParams<double>(P_E, P_M, P_Q), true);
 
   std::cout << "\nSNV likelihood: " << snv_before;
