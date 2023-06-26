@@ -12,6 +12,7 @@
 #include "src/tree_sampler_coordinator.h"
 #include "src/utils/random.h"
 #include "src/attachment_enricher.h"
+#include "src/tree_prunner.h"
 
 #include <boost/program_options.hpp>
 
@@ -65,7 +66,9 @@ int main(int argc, char **argv) {
       "SNV penalty constant")("tries", po::value<size_t>()->default_value(1))(
       "estimate_snv_constant", po::value<bool>()->default_value(true))(
       "snv_scaling_factor", po::value<double>()->default_value(0.01),
-      "SNV_SCALING_FACTOR");
+      "SNV_SCALING_FACTOR")
+      ("min_coverage", po::value<double>()->default_value(5), "Minimum coverage")
+      ;
   po::variables_map vm;
   po::store(po::command_line_parser(argc, argv).options(description).run(), vm);
   po::notify(vm);
@@ -100,6 +103,7 @@ int main(int argc, char **argv) {
   P_M = vm["m"].as<double>();
   P_Q = vm["q"].as<double>();
   SNV_CONSTANT = vm["snv_constant"].as<double>();
+  auto min_coverage = vm["min_coverage"].as<double>();
   size_t TRIES = vm["tries"].as<size_t>();
   Random<double> random(SEED);
 
@@ -226,5 +230,17 @@ int main(int argc, char **argv) {
       snv_file << label_to_str(n.first->label) << ";" << snv << "\n";
     }
   }
+
+  TreePrunner<double> prunner(results[max_idx].tree, enricher.attachment, provider, min_coverage);
+
+  bool prunned = true;
+  while(prunned) {
+    prunned = prunner.iter();
+  }
+
+  std::ofstream attachment_file2{
+      string(output_dir).append("prunned_attachment")};
+  attachment_file2 << prunner.attachment;
+
   return 0;
 }

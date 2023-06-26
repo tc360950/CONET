@@ -38,6 +38,7 @@ parser.add_argument('--dont_infer_breakpoints', type=bool, default=False)
 parser.add_argument('--sequencing_error', type=float, default=0.00001)
 parser.add_argument('--snv_clustered', type=int, default=0)
 parser.add_argument('--real_breakpoints', type=int, default=0)
+parser.add_argument('--min_coverage', type=float, default=10.0)
 
 args = parser.parse_args()
 
@@ -163,7 +164,8 @@ if __name__ == "__main__":
         e=params.e,
         m=params.m,
         q=params.q,
-        snv_clustered=args.snv_clustered
+        snv_clustered=args.snv_clustered,
+        min_coverage=args.min_coverage
     )
     conet.infer_tree(params)
     result = InferenceResult(params.output_dir, cc)
