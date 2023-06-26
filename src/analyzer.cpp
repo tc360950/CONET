@@ -11,6 +11,7 @@
 #include "src/tree/tree_formatter.h"
 #include "src/tree_sampler_coordinator.h"
 #include "src/utils/random.h"
+#include "src/attachment_enricher.h"
 
 #include <boost/program_options.hpp>
 
@@ -217,6 +218,23 @@ int main(int argc, char **argv) {
       lik_coord.persist_likelihood_calculation_result();
       coord.recalculate_counts_dispersion_penalty();
       max_attachment = lik_coord.get_max_attachment();
+      log("Creating enricher");
+      AttachmentEnricher<double> enricher{
+        tree,
+        max_attachment,
+        random.next_int(1000),
+        provider
+      };
+      log("STarting enriching");
+      for (size_t i = 0; i < 1000000; i++) {
+        enricher.iter();
+        if (i % 100 ==0) {
+            log("Enricher iter ", i);
+        }
+      }
+      log("Enricher ended with acceopted: ", enricher.accepted);
+      max_attachment = enricher.attachment;
+
    }
   log("Saving inferred tree");
   std::ofstream tree_file{string(output_dir).append("inferred_tree")};
@@ -229,6 +247,22 @@ int main(int argc, char **argv) {
   SNVSolver<double> snv_solver(provider);
   auto snv_before = snv_solver.insert_snv_events(
       tree, max_attachment, SNVParams<double>(P_E, P_M, P_Q), true);
+
+  std::ofstream genotypes_file{string(output_dir).append("inferred_genotypes")};
+
+  for (auto n : tree.get_descendants(tree.get_root())) {
+    if (snv_solver.likelihood.node_to_snv_genotype.find(n) != snv_solver.likelihood.node_to_snv_genotype.end()) {
+        auto label = tree.get_node_label(n);
+        for (auto k_v: snv_solver.likelihood.node_to_snv_genotype[n]) {
+            for (size_t cell = 0; cell < max_attachment.cell_to_tree_label.size(); cell++) {
+                if (max_attachment.cell_to_tree_label[cell] == label) {
+                    auto gen = k_v.second;
+                    genotypes_file << cell << ";" << k_v.first << ";" <<gen.altered << ";" << gen.cn<<"\n";
+                }
+            }
+        }
+    }
+  }
 
   std::cout << "\nSNV likelihood: " << snv_before;
   std::ofstream snv_file{string(output_dir).append("inferred_snvs")};

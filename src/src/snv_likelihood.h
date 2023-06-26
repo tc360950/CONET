@@ -224,7 +224,8 @@ public:
                           Attachment &a,
                           bool cn_overlap,
                           std::map<TreeLabel,
-                          std::set<size_t>> &label_to_cell) {
+                          std::set<size_t>> &label_to_cell,
+                          bool has_snv) {
     auto event = get_event_from_label(node->label);
     if (node != tree.get_root() && snvs[snv].overlaps_with_event(event)) {
       cn_overlap = true;
@@ -232,9 +233,8 @@ public:
     size_t cn = 0;
     Real_t result = 0.0;
     Genotype<Real_t> genotype(0,0);
-    bool has_snv = false;
     if (node_to_snv.find(node) != node_to_snv.end()) {
-        has_snv = node_to_snv[node].find(snv) != node_to_snv[node].end();
+        has_snv = has_snv || node_to_snv[node].find(snv) != node_to_snv[node].end();
     }
     if (a.has_attached_cells(node->label) > 0 && has_snv) {
       for (auto cell : label_to_cell[node->label]) {
@@ -279,7 +279,7 @@ public:
     }
 
     for (auto child : tree.get_children(node)) {
-      calculate_inferred_genotypes(child, p, tree, snv, a, cn_overlap, label_to_cell);
+      calculate_inferred_genotypes(child, p, tree, snv, a, cn_overlap, label_to_cell, has_snv);
     }
   }
 
@@ -649,7 +649,7 @@ Real_t insert_snv_events(EventTree &tree, Attachment &at, SNVParams<Real_t> p,
       }
     }
     for (size_t snv = 0; snv < cells.snvs.size(); snv++) {
-       likelihood.calculate_inferred_genotypes(tree.get_root(), p, tree, snv, at,false, label_to_cell);
+       likelihood.calculate_inferred_genotypes(tree.get_root(), p, tree, snv, at,false, label_to_cell, false);
     }
     return likelihood.get_total_likelihood(p, tree, at, 0, cells.snvs.size(),
                                            all);
