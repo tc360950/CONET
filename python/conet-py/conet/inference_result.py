@@ -16,8 +16,10 @@ class InferenceResult:
         self.__cc = cc
         self.__tree = self.__load_inferred_tree(output_path + "inferred_tree")
         self.__attachment = self.__load_attachment(output_path + "inferred_attachment")
+        self.__prunned_attachment = self.__load_attachment(output_path + "prunned_attachment")
         self.inferred_tree = self.__get_pretty_tree()
         self.attachment = self.__get_pretty_attachment()
+        self.prunned_attachment  = [self.__node_to_pretty(n) for n in self.__prunned_attachment]
         self.inferred_snvs = self.__get_inferred_snvs(output_path + "inferred_snvs")
         self._clustered = clustered
         self._cell_to_cluster = None if not clustered else self.__get_cell_to_cluster(output_path + "cell_to_cluster")
@@ -57,6 +59,16 @@ class InferenceResult:
                     f.write(";".join(
                         [cells[i], str(i), f"{int(self.attachment[i]['chr'])}_{self.attachment[i]['bin_start']}",
                          f"{int(self.attachment[i]['chr'])}_{self.attachment[i]['bin_end']}\n"]))
+
+        with open(dir + "prunned_attachment", 'w') as f:
+            cells = self.__cc.get_cells_names()
+            for i in range(0, len(self.prunned_attachment)):
+                if self.prunned_attachment[i] == {}:
+                    f.write(";".join([cells[i], str(i), "0;0\n"]))
+                else:
+                    f.write(";".join(
+                        [cells[i], str(i), f"{int(self.prunned_attachment[i]['chr'])}_{self.prunned_attachment[i]['bin_start']}",
+                         f"{int(self.prunned_attachment[i]['chr'])}_{self.prunned_attachment[i]['bin_end']}\n"]))
 
         with open(dir + "inferred_snvs2", 'w') as f:
             for s in self.inferred_snvs:
