@@ -1,4 +1,7 @@
 import argparse
+import json
+import statistics
+import time
 
 import numpy as np
 import pandas as pd
@@ -57,6 +60,7 @@ if __name__ == "__main__":
     if (Path(args.data_dir) / Path("real_breakpoints.txt")).exists():
         shutil.copyfile(Path(args.data_dir) / Path("real_breakpoints.txt"), Path(data_dir) / Path("real_breakpoints.txt"))
 
+    start_ts = time.time()
     print("Inferring CN profiles using CBS+MergeLevels...")
     corrected_counts: pd.DataFrame = pd.read_csv(Path(data_dir) / Path("cc"))
     if not args.recalculate_cbs:
@@ -232,4 +236,17 @@ if __name__ == "__main__":
 
     result.dump_results_to_dir(args.output_dir, neutral_cn=args.neutral_cn)
 
+    end_ts = time.time()
 
+    clusters = list(set(clustering))
+    clusters.sort()
+    cluster_sizes_ = [sum([1 for x in clustering if x == c]) for c in clusters]
+    mean_size = sum(cluster_sizes_) / len(cluster_sizes_)
+    std_dev = statistics.pstdev(cluster_sizes_)
+    with open(Path(args.output_dir) / Path("run_metadata.json"), "w") as outfile:
+        outfile.write(json.dumps({
+            "clusters": len(clusters),
+            "mean_cluster_size": mean_size,
+            "stddev_cluster_size": std_dev,
+            "time": (end_ts -start_ts)
+        }))

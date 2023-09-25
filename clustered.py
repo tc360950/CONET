@@ -1,4 +1,7 @@
 import argparse
+import json
+import statistics
+import time
 
 import numpy as np
 import pandas as pd
@@ -52,28 +55,30 @@ if __name__ == "__main__":
     shutil.copyfile(Path(args.data_dir) / Path("B"), Path(data_dir) / Path("B"))
     shutil.copyfile(Path(args.data_dir) / Path("cc"), Path(data_dir) / Path("cc"))
     if (Path(args.data_dir) / Path("real_breakpoints.txt")).exists():
-        shutil.copyfile(Path(args.data_dir) / Path("real_breakpoints.txt"), Path(data_dir) / Path("real_breakpoints.txt"))
+        shutil.copyfile(Path(args.data_dir) / Path("real_breakpoints.txt"),
+                        Path(data_dir) / Path("real_breakpoints.txt"))
 
+    start_ts = time.time()
     print("Inferring breakpoints and CN profiles...")
     corrected_counts: pd.DataFrame = pd.read_csv(Path(data_dir) / Path("cc"))
-    if (Path(data_dir)/ Path('cc_with_candidates')).exists() and (Path(data_dir)/ Path('cn_cbs')).exists() and False:
+    if (Path(data_dir) / Path('cc_with_candidates')).exists() and (Path(data_dir) / Path('cn_cbs')).exists() and False:
         print("CBS+MegeLevels output files found in output directory, skipping inference...")
     else:
         x = subprocess.run(["Rscript", "CBS_MergeLevels.R", f"--mincells={args.cbs_min_cells}",
-                            f"--output={Path(data_dir)/ Path('cc_with_candidates')}", f"--cn_output={Path(data_dir)/ Path('cn_cbs')}",
+                            f"--output={Path(data_dir) / Path('cc_with_candidates')}",
+                            f"--cn_output={Path(data_dir) / Path('cn_cbs')}",
                             f"--dataset={Path(data_dir) / Path('cc')}"])
 
         if x.returncode != 0:
             raise RuntimeError("Breakpoint inference failed")
 
-    cn = pd.read_csv(Path(data_dir)/ Path('cn_cbs'), header=None)
+    cn = pd.read_csv(Path(data_dir) / Path('cn_cbs'), header=None)
     if args.dont_infer_breakpoints:
         cc_with_candidates = pd.read_csv(Path(data_dir) / Path("cc"), sep=",")
     else:
-        cc_with_candidates = pd.read_csv(Path(data_dir)/ Path('cc_with_candidates'))
+        cc_with_candidates = pd.read_csv(Path(data_dir) / Path('cc_with_candidates'))
         print("Breakpoint inference finished")
         print(f"Found {np.sum(cc_with_candidates.candidate_brkp)} breakpoints")
-
 
     if args.real_breakpoints > 0:
         with open(Path(data_dir) / Path("real_breakpoints.txt"), "r") as f:
@@ -132,7 +137,7 @@ if __name__ == "__main__":
         if bin < 0 or cc_with_candidates.chr.iloc[snvs_data[i, 1]] != cc_with_candidates.chr.iloc[bin]:
             snvs_data[i, 1] = -1
         else:
-            snvs_data[i, 1] =  brkp_candidate_bin_to_num[bin]
+            snvs_data[i, 1] = brkp_candidate_bin_to_num[bin]
     np.savetxt(str(Path(data_dir) / Path("snvs_data")), snvs_data, delimiter=";")
 
     cc = CorrectedCounts(cc_with_candidates)
@@ -175,3 +180,13 @@ if __name__ == "__main__":
 
     result.dump_results_to_dir(args.output_dir, neutral_cn=args.neutral_cn)
 
+    end_ts = time.time()
+    mean_size = sum(cluster_sizes) / len(cluster_sizes)
+    std_dev = statistics.pstdev(cluster_sizes)
+    with open(Path(args.output_dir) / Path("run_metadata.json"), "w") as outfile:
+        outfile.write(json.dumps({
+            "clusters": len(cluster_sizes),
+            "mean_cluster_size": mean_size,
+            "stddev_cluster_size": std_dev,
+            "time": (end_ts -start_ts)
+        }))
